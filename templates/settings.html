@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>الإعدادات - نظام الحوكمة</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    {% include 'sidebar.html' %}
+    
+    <div class="main-content">
+        <div class="page-header">
+            <h1>⚙️ الإعدادات</h1>
+            <p>إعدادات الحساب والنظام</p>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-user ms-2"></i>معلومات الحساب</h5>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th>الاسم:</th>
+                                <td>{{ user.full_name }}</td>
+                            </tr>
+                            <tr>
+                                <th>اسم المستخدم:</th>
+                                <td>{{ user.username }}</td>
+                            </tr>
+                            <tr>
+                                <th>القسم:</th>
+                                <td>{{ user.department }}</td>
+                            </tr>
+                            <tr>
+                                <th>الدور:</th>
+                                <td><span class="badge badge-primary">{{ user.role }}</span></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-info-circle ms-2"></i>معلومات النظام</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>النسخة:</strong> 2.0</p>
+                        <p><strong>التقنية:</strong> Flask + Bootstrap</p>
+                        <p><strong>قاعدة البيانات:</strong> SQLite</p>
+                        <p class="mb-0"><strong>الحالة:</strong> <span class="badge badge-success">نشط</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

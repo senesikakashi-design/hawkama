@@ -1,0 +1,56 @@
+<!-- Sidebar -->
+<div class="sidebar">
+    <div class="sidebar-header">
+        <h5><i class="fas fa-user-circle ms-2"></i>{{ user.full_name }}</h5>
+        <small class="text-muted">{{ user.department }}</small>
+    </div>
+    
+    <ul class="sidebar-menu">
+        <li><a href="{{ url_for('dashboard') }}" {% if request.endpoint == 'dashboard' %}class="active"{% endif %}>
+            <i class="fas fa-chart-line"></i> لوحة التحكم
+        </a></li>
+        
+        {% if user.role in ['compliance_officer', 'general_manager'] %}
+        <li><a href="{{ url_for('manage_branches') }}" {% if request.endpoint == 'manage_branches' %}class="active"{% endif %}>
+            <i class="fas fa-building"></i> إدارة الفروع
+        </a></li>
+        {% endif %}
+        
+        {% if user.role == 'compliance_officer' or (user.role == 'department_head' and user.department == 'IT') %}
+        <li><a href="{{ url_for('manage_users') }}" {% if request.endpoint == 'manage_users' %}class="active"{% endif %}>
+            <i class="fas fa-users"></i> إدارة المستخدمين
+        </a></li>
+        {% endif %}
+        
+        <li><a href="{{ url_for('requests') }}" {% if request.endpoint == 'requests' %}class="active"{% endif %}>
+            <i class="fas fa-ticket-alt"></i> الطلبات
+        </a></li>
+        
+        <li><a href="{{ url_for('new_request') }}" {% if request.endpoint == 'new_request' %}class="active"{% endif %}>
+            <i class="fas fa-plus-circle"></i> طلب جديد
+        </a></li>
+        
+        {% if user.role in ['compliance_officer', 'general_manager', 'department_head'] %}
+        <li><a href="{{ url_for('reports') }}" {% if request.endpoint == 'reports' %}class="active"{% endif %}>
+            <i class="fas fa-chart-bar"></i> التقارير
+        </a></li>
+        {% endif %}
+        
+        {% if user.role == 'compliance_officer' %}
+        <li><a href="{{ url_for('system_variables') }}" {% if request.endpoint == 'system_variables' %}class="active"{% endif %}>
+            <i class="fas fa-cogs"></i> متغيرات النظام
+        </a></li>
+        {% endif %}
+        
+        <li><a href="{{ url_for('settings') }}" {% if request.endpoint == 'settings' %}class="active"{% endif %}>
+            <i class="fas fa-cog"></i> الإعدادات
+        </a></li>
+    </ul>
+    
+    <div class="mt-auto pt-4">
+        <a href="{{ url_for('logout') }}" class="btn btn-logout">
+            <i class="fas fa-sign-out-alt ms-2"></i>
+            تسجيل الخروج
+        </a>
+    </div>
+</div>

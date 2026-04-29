@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>التقارير</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    {% include 'sidebar.html' %}
+    
+    <div class="main-content">
+        <div class="page-header">
+            <h1>📊 التقارير والإحصائيات</h1>
+            <p>عرض تقارير الأداء</p>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="stat-card text-center">
+                    <i class="fas fa-file-alt fa-3x text-primary mb-3"></i>
+                    <div class="stat-value">{{ stats.get('total_requests', 0) }}</div>
+                    <div class="stat-label">إجمالي الطلبات</div>
+                </div>
+            </div>
+            
+            <div class="col-md-3 mb-3">
+                <div class="stat-card text-center">
+                    <i class="fas fa-clock fa-3x mb-3" style="color: #ff9800"></i>
+                    <div class="stat-value" style="color: #ff9800;">{{ stats.get('pending_requests', 0) }}</div>
+                    <div class="stat-label">قيد المعالجة</div>
+                </div>
+            </div>
+            
+            <div class="col-md-3 mb-3">
+                <div class="stat-card text-center">
+                    <i class="fas fa-tasks fa-3x mb-3" style="color: #ffc107"></i>
+                    <div class="stat-value" style="color: #ffc107;">{{ stats.get('in_progress_requests', 0) }}</div>
+                    <div class="stat-label">قيد الإنجاز</div>
+                </div>
+            </div>
+            
+            <div class="col-md-3 mb-3">
+                <div class="stat-card text-center">
+                    <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                    <div class="stat-value" style="color: #4caf50;">{{ stats.get('completed_requests', 0) }}</div>
+                    <div class="stat-label">منجز</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-table ms-2"></i>جدول الطلبات الكامل</h5>
+                <a href="{{ url_for('export_excel') }}" class="btn btn-success btn-sm">
+                    <i class="fas fa-file-excel ms-2"></i>
+                    تصدير Excel
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>العنوان</th>
+                                <th>النوع</th>
+                                <th>الحالة</th>
+                                <th>الأولوية</th>
+                                <th>القسم</th>
+                                <th>الفرع</th>
+                                <th>المنشئ</th>
+                                <th>التاريخ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in requests %}
+                            <tr>
+                                <td>{{ req.id }}</td>
+                                <td>{{ req.title }}</td>
+                                <td>{{ req.request_type }}</td>
+                                <td>
+                                    {% if req.status == 'pending' %}
+                                        <span class="badge" style="background: #ff9800">قيد المعالجة</span>
+                                    {% elif req.status == 'in_progress' %}
+                                        <span class="badge" style="background: #ffc107">قيد الإنجاز</span>
+                                    {% elif req.status == 'completed' %}
+                                        <span class="badge" style="background: #4caf50">منجز</span>
+                                    {% elif req.status == 'approved' %}
+                                        <span class="badge" style="background: #2196f3">موافق عليه</span>
+                                    {% else %}
+                                        <span class="badge" style="background: #f44336">مرفوض</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if req.priority == 'high' %}
+                                        <span class="badge badge-danger">عالية</span>
+                                    {% elif req.priority == 'medium' %}
+                                        <span class="badge badge-warning">متوسطة</span>
+                                    {% else %}
+                                        <span class="badge badge-success">منخفضة</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ req.department }}</td>
+                                <td>{{ req.branch_name or '-' }}</td>
+                                <td>{{ req.creator_name }}</td>
+                                <td>{{ req.created_at[:10] }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
