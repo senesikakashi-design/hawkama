@@ -429,3 +429,49 @@ class Database:
     def create_backup(self):
         """إنشاء نسخة احتياطية"""
         return True
+
+def get_dashboard_stats(self):
+        """إحصائيات لوحة التحكم"""
+        conn = self.get_connection()
+        
+        try:
+            # عدد المستخدمين
+            users = conn.execute(text("SELECT COUNT(*) as count FROM users WHERE is_active = TRUE")).fetchone()
+            
+            # عدد الفروع
+            branches = conn.execute(text("SELECT COUNT(*) as count FROM branches WHERE is_active = TRUE")).fetchone()
+            
+            # عدد الطلبات
+            total_requests = conn.execute(text("SELECT COUNT(*) as count FROM requests")).fetchone()
+            
+            # الطلبات المعلقة
+            pending = conn.execute(text("SELECT COUNT(*) as count FROM requests WHERE status = 'pending'")).fetchone()
+            
+            return {
+                'total_users': users[0] if users else 0,
+                'total_branches': branches[0] if branches else 0,
+                'total_requests': total_requests[0] if total_requests else 0,
+                'pending_requests': pending[0] if pending else 0
+            }
+        finally:
+            conn.close()
+    
+    def get_all_roles(self):
+        """الحصول على كل الأدوار"""
+        return [
+            {'role_name': 'compliance_officer', 'role_name_ar': 'مسؤول الامتثال'},
+            {'role_name': 'general_manager', 'role_name_ar': 'مدير عام'},
+            {'role_name': 'department_head', 'role_name_ar': 'رئيس قسم'},
+            {'role_name': 'employee', 'role_name_ar': 'موظف'}
+        ]
+    
+    def get_all_departments(self):
+        """الحصول على كل الأقسام"""
+        return [
+            {'dept_name': 'Compliance', 'dept_name_ar': 'الامتثال'},
+            {'dept_name': 'Management', 'dept_name_ar': 'الإدارة'},
+            {'dept_name': 'IT', 'dept_name_ar': 'تقنية المعلومات'},
+            {'dept_name': 'Finance', 'dept_name_ar': 'المالية'},
+            {'dept_name': 'HR', 'dept_name_ar': 'الموارد البشرية'},
+            {'dept_name': 'Operations', 'dept_name_ar': 'العمليات'}
+        ]
