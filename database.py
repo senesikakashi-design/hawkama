@@ -429,28 +429,19 @@ class Database:
     def create_backup(self):
         """إنشاء نسخة احتياطية"""
         return True
-
-def get_dashboard_stats(self):
+    
+    def get_dashboard_stats(self):
         """إحصائيات لوحة التحكم"""
         conn = self.get_connection()
-        
         try:
-            # عدد المستخدمين
-            users = conn.execute(text("SELECT COUNT(*) as count FROM users WHERE is_active = TRUE")).fetchone()
-            
-            # عدد الفروع
-            branches = conn.execute(text("SELECT COUNT(*) as count FROM branches WHERE is_active = TRUE")).fetchone()
-            
-            # عدد الطلبات
-            total_requests = conn.execute(text("SELECT COUNT(*) as count FROM requests")).fetchone()
-            
-            # الطلبات المعلقة
-            pending = conn.execute(text("SELECT COUNT(*) as count FROM requests WHERE status = 'pending'")).fetchone()
-            
+            users = conn.execute(text("SELECT COUNT(*) FROM users WHERE is_active = TRUE")).fetchone()
+            branches = conn.execute(text("SELECT COUNT(*) FROM branches WHERE is_active = TRUE")).fetchone()
+            requests = conn.execute(text("SELECT COUNT(*) FROM requests")).fetchone()
+            pending = conn.execute(text("SELECT COUNT(*) FROM requests WHERE status = 'pending'")).fetchone()
             return {
                 'total_users': users[0] if users else 0,
                 'total_branches': branches[0] if branches else 0,
-                'total_requests': total_requests[0] if total_requests else 0,
+                'total_requests': requests[0] if requests else 0,
                 'pending_requests': pending[0] if pending else 0
             }
         finally:
