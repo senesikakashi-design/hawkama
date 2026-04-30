@@ -6,6 +6,7 @@ import os
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 import bcrypt
+from datetime import datetime
 
 class Database:
     """إدارة قاعدة البيانات"""
@@ -110,6 +111,17 @@ class Database:
                 )
             """))
             
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS system_variables (
+                    id SERIAL PRIMARY KEY,
+                    var_name VARCHAR(100) UNIQUE NOT NULL,
+                    var_value TEXT,
+                    var_type VARCHAR(50),
+                    description TEXT,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            
             conn.commit()
             self.create_default_data(conn)
             
@@ -151,23 +163,23 @@ class Database:
         if result[0] == 0:
             branches = [
                 ('HQ-001', 'المقر الرئيسي - HQ', 'بغداد - المنصور', '07700000001', 'إدارة المقر'),
-                ('SVD-001', 'فرع السيعودن', 'بغداد - السيعودن', '07700000002', 'مدير السيعودن'),
+                ('SAD-001', 'فرع السعدون', 'بغداد - السعدون', '07700000002', 'مدير السعدون'),
                 ('HAR-001', 'فرع الحارثية', 'بغداد - الحارثية', '07700000003', 'مدير الحارثية'),
-                ('SHU-001', 'فرع الشعلة', 'بغداد - الشعلة', '07700000004', 'مدير الشعلة'),
-                ('KRD-001', 'فرع الكرادة', 'بغداد - الكرادة', '07700000005', 'مدير الكرادة'),
+                ('SAY-001', 'فرع السيدية', 'بغداد - السيدية', '07700000004', 'مدير السيدية'),
+                ('ZAY-001', 'فرع زيونة', 'بغداد - زيونة', '07700000005', 'مدير زيونة'),
                 ('DRA-001', 'فرع الدورة', 'بغداد - الدورة', '07700000006', 'مدير الدورة'),
-                ('ADA-001', 'فرع العدل', 'بغداد - العدل', '07700000007', 'مدير العدل'),
-                ('MNS-001', 'فرع المنصور 2', 'بغداد - المنصور', '07700000008', 'مدير المنصور 2'),
+                ('KRB-001', 'فرع كربلاء', 'كربلاء', '07700000007', 'مدير كربلاء'),
+                ('BAB-001', 'فرع بابل', 'بابل - الحلة', '07700000008', 'مدير بابل'),
                 ('BSR-001', 'فرع البصرة', 'البصرة - العشار', '07700000009', 'مدير البصرة'),
-                ('NAJ-001', 'فرع النجف', 'النجف', '07700000010', 'مدير النجف'),
+                ('KRK-001', 'فرع كركوك', 'كركوك', '07700000010', 'مدير كركوك'),
                 ('ERB-001', 'فرع أربيل', 'أربيل', '07700000011', 'مدير أربيل'),
-                ('KRK-001', 'فرع كركوك', 'كركوك', '07700000012', 'مدير كركوك'),
-                ('MSL-001', 'فرع الموصل', 'الموصل', '07700000013', 'مدير الموصل'),
-                ('DHK-001', 'فرع دهوك', 'دهوك', '07700000014', 'مدير دهوك'),
-                ('KRB-001', 'فرع كربلاء', 'كربلاء', '07700000015', 'مدير كربلاء'),
+                ('TIK-001', 'فرع تكريت', 'تكريت - صلاح الدين', '07700000012', 'مدير تكريت'),
+                ('MNS-001', 'فرع المنصور', 'بغداد - المنصور', '07700000013', 'مدير المنصور'),
+                ('MSL-001', 'فرع الموصل', 'الموصل - نينوى', '07700000014', 'مدير الموصل'),
+                ('MYS-001', 'فرع ميسلون', 'بغداد - ميسلون', '07700000015', 'مدير ميسلون'),
                 ('SLM-001', 'فرع السليمانية', 'السليمانية', '07700000016', 'مدير السليمانية'),
-                ('DWN-001', 'فرع ديوانية', 'الديوانية', '07700000017', 'مدير الديوانية'),
-                ('AMR-001', 'فرع عمارة', 'العمارة', '07700000018', 'مدير العمارة')
+                ('NAJ-001', 'فرع النجف', 'النجف', '07700000017', 'مدير النجف'),
+                ('FAL-001', 'فرع الفلوجة', 'الفلوجة - الأنبار', '07700000018', 'مدير الفلوجة')
             ]
             
             for code, name, city, phone, manager in branches:
@@ -436,6 +448,164 @@ class Database:
         result = conn.execute(text(query)).fetchall()
         conn.close()
         return [self._row_to_dict(row) for row in result]
+    
+    def get_request_by_id(self, request_id):
+        """الحصول على طلب"""
+        conn = self.get_connection()
+        result = conn.execute(
+            text("""
+                SELECT r.*, 
+                       u1.full_name as creator_name,
+                       u2.full_name as assignee_name,
+                       b.name as branch_name
+                FROM requests r
+                LEFT JOIN users u1 ON r.created_by = u1.id
+                LEFT JOIN users u2 ON r.assigned_to = u2.id
+                LEFT JOIN branches b ON r.branch_id = b.id
+                WHERE r.id = :id
+            """),
+            {'id': request_id}
+        ).fetchone()
+        conn.close()
+        return self._row_to_dict(result)
+    
+    def create_request(self, data):
+        """إنشاء طلب جديد"""
+        conn = self.get_connection()
+        
+        try:
+            result = conn.execute(text("""
+                INSERT INTO requests (title, description, request_type, priority, status, created_by, assigned_to, branch_id, created_at, updated_at)
+                VALUES (:title, :description, :request_type, :priority, :status, :created_by, :assigned_to, :branch_id, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                RETURNING id
+            """), {
+                'title': data['title'],
+                'description': data.get('description', ''),
+                'request_type': data['request_type'],
+                'priority': data.get('priority', 'medium'),
+                'status': 'pending',
+                'created_by': data['created_by'],
+                'assigned_to': data.get('assigned_to'),
+                'branch_id': data.get('branch_id')
+            })
+            
+            request_id = result.fetchone()[0]
+            conn.commit()
+            return request_id
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+    
+    def update_request(self, request_id, data):
+        """تحديث طلب"""
+        conn = self.get_connection()
+        
+        try:
+            conn.execute(text("""
+                UPDATE requests 
+                SET title = :title,
+                    description = :description,
+                    request_type = :request_type,
+                    priority = :priority,
+                    status = :status,
+                    assigned_to = :assigned_to,
+                    branch_id = :branch_id,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = :id
+            """), {
+                'title': data['title'],
+                'description': data.get('description', ''),
+                'request_type': data['request_type'],
+                'priority': data.get('priority', 'medium'),
+                'status': data.get('status', 'pending'),
+                'assigned_to': data.get('assigned_to'),
+                'branch_id': data.get('branch_id'),
+                'id': request_id
+            })
+            
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+    
+    def get_all_system_vars(self):
+        """الحصول على كل متغيرات النظام"""
+        conn = self.get_connection()
+        result = conn.execute(text("SELECT * FROM system_variables ORDER BY var_name")).fetchall()
+        conn.close()
+        return [self._row_to_dict(row) for row in result]
+    
+    def get_system_var(self, var_name):
+        """الحصول على متغير نظام"""
+        conn = self.get_connection()
+        result = conn.execute(
+            text("SELECT * FROM system_variables WHERE var_name = :name"),
+            {'name': var_name}
+        ).fetchone()
+        conn.close()
+        return self._row_to_dict(result)
+    
+    def set_system_var(self, var_name, var_value, var_type='string', description=''):
+        """تعيين متغير نظام"""
+        conn = self.get_connection()
+        
+        try:
+            existing = conn.execute(
+                text("SELECT id FROM system_variables WHERE var_name = :name"),
+                {'name': var_name}
+            ).fetchone()
+            
+            if existing:
+                conn.execute(text("""
+                    UPDATE system_variables 
+                    SET var_value = :value, var_type = :type, description = :desc, updated_at = CURRENT_TIMESTAMP
+                    WHERE var_name = :name
+                """), {
+                    'value': var_value,
+                    'type': var_type,
+                    'desc': description,
+                    'name': var_name
+                })
+            else:
+                conn.execute(text("""
+                    INSERT INTO system_variables (var_name, var_value, var_type, description, updated_at)
+                    VALUES (:name, :value, :type, :desc, CURRENT_TIMESTAMP)
+                """), {
+                    'name': var_name,
+                    'value': var_value,
+                    'type': var_type,
+                    'desc': description
+                })
+            
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+    
+    def delete_system_var(self, var_name):
+        """حذف متغير نظام"""
+        conn = self.get_connection()
+        
+        try:
+            conn.execute(
+                text("DELETE FROM system_variables WHERE var_name = :name"),
+                {'name': var_name}
+            )
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
     
     def create_backup(self):
         """إنشاء نسخة احتياطية"""
