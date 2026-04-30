@@ -294,3 +294,136 @@ class Database:
             'can_view_reports': False,
             'can_manage_system_vars': False
         }
+        def add_user(self, data):
+        """إضافة مستخدم جديد"""
+        conn = self.get_connection()
+        
+        try:
+            hashed = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt())
+            
+            conn.execute(text("""
+                INSERT INTO users (username, password, full_name, email, role, department, branch_id, is_active)
+                VALUES (:username, :password, :full_name, :email, :role, :department, :branch_id, TRUE)
+            """), {
+                'username': data['username'],
+                'password': hashed.decode('utf-8'),
+                'full_name': data['full_name'],
+                'email': data.get('email', ''),
+                'role': data['role'],
+                'department': data['department'],
+                'branch_id': data.get('branch_id')
+            })
+            
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+    
+    def update_user(self, user_id, data):
+        """تحديث مستخدم"""
+        conn = self.get_connection()
+        
+        try:
+            query = """
+                UPDATE users 
+                SET full_name = :full_name, 
+                    email = :email, 
+                    role = :role, 
+                    department = :department, 
+                    branch_id = :branch_id,
+                    is_active = :is_active
+            """
+            
+            params = {
+                'full_name': data['full_name'],
+                'email': data.get('email', ''),
+                'role': data['role'],
+                'department': data['department'],
+                'branch_id': data.get('branch_id'),
+                'is_active': data.get('is_active', True),
+                'user_id': user_id
+            }
+            
+            if 'password' in data and data['password']:
+                hashed = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt())
+                query += ", password = :password"
+                params['password'] = hashed.decode('utf-8')
+            
+            query += " WHERE id = :user_id"
+            
+            conn.execute(text(query), params)
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+    
+    def get_branch_by_id(self, branch_id):
+        """الحصول على فرع"""
+        conn = self.get_connection()
+        result = conn.execute(
+            text("SELECT * FROM branches WHERE id = :id"),
+            {'id': branch_id}
+        ).fetchone()
+        conn.close()
+        return self._row_to_dict(result)
+    
+    def update_branch(self, branch_id, data):
+        """تحديث فرع"""
+        conn = self.get_connection()
+        
+        try:
+            conn.execute(text("""
+                UPDATE branches 
+                SET name = :name, 
+                    city = :city, 
+                    address = :address, 
+                    phone = :phone, 
+                    manager_name = :manager
+                WHERE id = :id
+            """), {
+                'name': data['name'],
+                'city': data['city'],
+                'address': data.get('address', ''),
+                'phone': data.get('phone', ''),
+                'manager': data.get('manager_name', ''),
+                'id': branch_id
+            })
+            
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+    
+    def get_all_requests(self, user=None, status=None):
+        """الحصول على كل الطلبات"""
+        conn = self.get_connection()
+        
+        query = """
+            SELECT r.*, 
+                   u1.full_name as creator_name,
+                   u2.full_name as assignee_name,
+                   b.name as branch_name
+            FROM requests r
+            LEFT JOIN users u1 ON r.created_by = u1.id
+            LEFT JOIN users u2 ON r.assigned_to = u2.id
+            LEFT JOIN branches b ON r.branch_id = b.id
+            ORDER BY r.created_at DESC
+        """
+        
+        result = conn.execute(text(query)).fetchall()
+        conn.close()
+        return [self._row_to_dict(row) for row in result]
+    
+    def create_backup(self):
+        """إنشاء نسخة احتياطية"""
+        # في PostgreSQL النسخ الاحتياطي يتم عبر Supabase نفسه
+        return True
