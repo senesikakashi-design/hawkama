@@ -25,7 +25,7 @@ class Database:
         """تحويل Row إلى dict"""
         if row is None:
             return None
-        return dict(zip(row.keys(), row))
+        return {key: value for key, value in row._mapping.items()}
     
     def init_database(self):
         """إنشاء الجداول"""
