@@ -32,7 +32,6 @@ class Database:
         conn = self.get_connection()
         
         try:
-            # جدول المستخدمين
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS users (
                     id SERIAL PRIMARY KEY,
@@ -48,7 +47,6 @@ class Database:
                 )
             """))
             
-            # جدول الفروع
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS branches (
                     id SERIAL PRIMARY KEY,
@@ -63,7 +61,6 @@ class Database:
                 )
             """))
             
-            # جدول الطلبات
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS requests (
                     id SERIAL PRIMARY KEY,
@@ -80,7 +77,6 @@ class Database:
                 )
             """))
             
-            # جدول التعليقات
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS comments (
                     id SERIAL PRIMARY KEY,
@@ -91,7 +87,6 @@ class Database:
                 )
             """))
             
-            # جدول الصلاحيات
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS user_permissions (
                     id SERIAL PRIMARY KEY,
@@ -104,7 +99,6 @@ class Database:
                 )
             """))
             
-            # جدول الإشعارات
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS notifications (
                     id SERIAL PRIMARY KEY,
@@ -127,7 +121,6 @@ class Database:
     
     def create_default_data(self, conn):
         """البيانات الأساسية"""
-        
         result = conn.execute(text("SELECT COUNT(*) as count FROM users")).fetchone()
         
         if result[0] == 0:
@@ -286,7 +279,6 @@ class Database:
         if result:
             return self._row_to_dict(result)
         
-        # إرجاع صلاحيات افتراضية
         return {
             'can_manage_users': False,
             'can_manage_branches': False,
@@ -294,8 +286,8 @@ class Database:
             'can_view_reports': False,
             'can_manage_system_vars': False
         }
-        
-        def add_user(self, data):
+    
+    def add_user(self, data):
         """إضافة مستخدم جديد"""
         conn = self.get_connection()
         
@@ -426,5 +418,4 @@ class Database:
     
     def create_backup(self):
         """إنشاء نسخة احتياطية"""
-        # في PostgreSQL النسخ الاحتياطي يتم عبر Supabase نفسه
         return True
