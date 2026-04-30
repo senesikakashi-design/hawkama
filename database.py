@@ -121,7 +121,7 @@ class Database:
             
         except Exception as e:
             conn.rollback()
-            print(f"Error: {e}")
+            print(f"Database Error: {e}")
         finally:
             conn.close()
     
@@ -181,6 +181,7 @@ class Database:
             conn.commit()
     
     def get_user_by_username(self, username):
+        """الحصول على مستخدم"""
         conn = self.get_connection()
         result = conn.execute(
             text("SELECT * FROM users WHERE username = :username"),
@@ -190,6 +191,7 @@ class Database:
         return self._row_to_dict(result)
     
     def get_user_by_id(self, user_id):
+        """الحصول على مستخدم بالمعرف"""
         conn = self.get_connection()
         result = conn.execute(
             text("SELECT * FROM users WHERE id = :id"),
@@ -199,9 +201,11 @@ class Database:
         return self._row_to_dict(result)
     
     def verify_password(self, plain_password, hashed_password):
+        """التحقق من كلمة المرور"""
         return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
     
     def get_all_branches(self, include_inactive=False):
+        """الحصول على كل الفروع"""
         conn = self.get_connection()
         
         if include_inactive:
@@ -214,6 +218,7 @@ class Database:
         return [self._row_to_dict(row) for row in result]
     
     def toggle_branch_status(self, branch_id):
+        """تبديل حالة الفرع"""
         conn = self.get_connection()
         conn.execute(
             text("UPDATE branches SET is_active = NOT is_active WHERE id = :id"),
@@ -224,6 +229,7 @@ class Database:
         return True
     
     def get_all_users(self, include_inactive=False):
+        """الحصول على كل المستخدمين"""
         conn = self.get_connection()
         
         query = """
@@ -242,6 +248,7 @@ class Database:
         return [self._row_to_dict(row) for row in result]
     
     def toggle_user_status(self, user_id):
+        """تبديل حالة المستخدم"""
         conn = self.get_connection()
         conn.execute(
             text("UPDATE users SET is_active = NOT is_active WHERE id = :id"),
@@ -252,6 +259,7 @@ class Database:
         return True
     
     def delete_user(self, user_id):
+        """حذف مستخدم نهائياً"""
         conn = self.get_connection()
         
         try:
@@ -265,3 +273,24 @@ class Database:
             raise e
         finally:
             conn.close()
+    
+    def get_user_permissions(self, user_id):
+        """الحصول على صلاحيات المستخدم"""
+        conn = self.get_connection()
+        result = conn.execute(
+            text("SELECT * FROM user_permissions WHERE user_id = :id"),
+            {'id': user_id}
+        ).fetchone()
+        conn.close()
+        
+        if result:
+            return self._row_to_dict(result)
+        
+        # إرجاع صلاحيات افتراضية
+        return {
+            'can_manage_users': False,
+            'can_manage_branches': False,
+            'can_view_requests': False,
+            'can_view_reports': False,
+            'can_manage_system_vars': False
+        }
