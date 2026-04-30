@@ -466,3 +466,45 @@ class Database:
             {'dept_name': 'HR', 'dept_name_ar': 'الموارد البشرية'},
             {'dept_name': 'Operations', 'dept_name_ar': 'العمليات'}
         ]
+    
+    def get_unread_count(self, user_id):
+        """عدد الإشعارات غير المقروءة"""
+        conn = self.get_connection()
+        try:
+            result = conn.execute(
+                text("SELECT COUNT(*) FROM notifications WHERE user_id = :id AND is_read = FALSE"),
+                {'id': user_id}
+            ).fetchone()
+            return result[0] if result else 0
+        finally:
+            conn.close()
+    
+    def get_unread_notifications(self, user_id):
+        """الإشعارات غير المقروءة"""
+        conn = self.get_connection()
+        try:
+            result = conn.execute(
+                text("""
+                    SELECT n.*, r.title as request_title
+                    FROM notifications n
+                    LEFT JOIN requests r ON n.request_id = r.id
+                    WHERE n.user_id = :id AND n.is_read = FALSE
+                    ORDER BY n.created_at DESC
+                """),
+                {'id': user_id}
+            ).fetchall()
+            return [self._row_to_dict(row) for row in result]
+        finally:
+            conn.close()
+    
+    def mark_notification_read(self, notif_id):
+        """تعليم الإشعار كمقروء"""
+        conn = self.get_connection()
+        try:
+            conn.execute(
+                text("UPDATE notifications SET is_read = TRUE WHERE id = :id"),
+                {'id': notif_id}
+            )
+            conn.commit()
+        finally:
+            conn.close()
