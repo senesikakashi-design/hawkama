@@ -624,7 +624,78 @@ def download_backup():
 @login_required
 def settings():
     return render_template('settings.html', user=current_user)
-
+@app.route('/admin/check_db')
+@login_required
+def check_databases():
+    """فحص قواعد البيانات"""
+    if current_user.role != 'compliance_officer':
+        return "Unauthorized", 403
+    
+    import os
+    import glob
+    
+    html = """
+    <html dir="rtl">
+    <head>
+        <meta charset="UTF-8">
+        <title>فحص قواعد البيانات</title>
+        <style>
+            body { font-family: Arial; padding: 20px; }
+            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            th, td { border: 1px solid #ddd; padding: 12px; text-align: right; }
+            th { background: #1a237e; color: white; }
+            .big { color: green; font-weight: bold; }
+            .small { color: red; }
+        </style>
+    </head>
+    <body>
+        <h1>📊 قواعد البيانات الموجودة</h1>
+        <table>
+            <tr>
+                <th>اسم الملف</th>
+                <th>الحجم (bytes)</th>
+                <th>الحجم (KB)</th>
+                <th>الحالة</th>
+            </tr>
+    """
+    
+    db_files = glob.glob('*.db')
+    
+    if not db_files:
+        html += "<tr><td colspan='4' style='text-align:center; color:red;'>❌ لا توجد ملفات قاعدة بيانات!</td></tr>"
+    else:
+        for db_file in db_files:
+            try:
+                size = os.path.getsize(db_file)
+                size_kb = size / 1024
+                
+                if size < 50000:
+                    status = "فاضي"
+                    css_class = "small"
+                else:
+                    status = "✅ فيه بيانات"
+                    css_class = "big"
+                
+                html += f"""
+                <tr>
+                    <td><strong>{db_file}</strong></td>
+                    <td>{size:,}</td>
+                    <td>{size_kb:.2f}</td>
+                    <td class='{css_class}'>{status}</td>
+                </tr>
+                """
+            except Exception as e:
+                html += f"<tr><td colspan='4'>خطأ: {str(e)}</td></tr>"
+    
+    html += """
+        </table>
+        <p><a href="/dashboard">← رجوع للوحة التحكم</a></p>
+    </body>
+    </html>
+    """
+    
+    return html
+    
 if __name__ == '__main__':
     import os
     port = int(os.environ.get('PORT', 8080))
