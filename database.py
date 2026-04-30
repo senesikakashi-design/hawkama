@@ -197,6 +197,16 @@ class Database:
         """التحقق من كلمة المرور"""
         return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
     
+    def verify_login(self, username, password):
+        """التحقق من تسجيل الدخول"""
+        user = self.get_user_by_username(username)
+        
+        if user and user['is_active']:
+            if self.verify_password(password, user['password']):
+                return user
+        
+        return None
+    
     def get_all_branches(self, include_inactive=False):
         """الحصول على كل الفروع"""
         conn = self.get_connection()
