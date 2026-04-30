@@ -46,7 +46,7 @@ class Database:
                     role VARCHAR(50) NOT NULL,
                     department VARCHAR(100) NOT NULL,
                     branch_id INTEGER,
-                    is_active BOOLEAN DEFAULT 1,
+                    is_active BOOLEAN DEFAULT TRUE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """))
@@ -60,7 +60,7 @@ class Database:
                     location VARCHAR(300),
                     manager_name VARCHAR(200),
                     contact_phone VARCHAR(50),
-                    is_active BOOLEAN DEFAULT 1,
+                    is_active BOOLEAN DEFAULT TRUE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """))
@@ -91,7 +91,7 @@ class Database:
                     role_name VARCHAR(100) UNIQUE NOT NULL,
                     role_name_ar VARCHAR(200) NOT NULL,
                     description TEXT,
-                    is_active BOOLEAN DEFAULT 1,
+                    is_active BOOLEAN DEFAULT TRUE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """))
@@ -103,7 +103,7 @@ class Database:
                     dept_name VARCHAR(100) UNIQUE NOT NULL,
                     dept_name_ar VARCHAR(200) NOT NULL,
                     description TEXT,
-                    is_active BOOLEAN DEFAULT 1,
+                    is_active BOOLEAN DEFAULT TRUE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """))
@@ -115,7 +115,7 @@ class Database:
                     status_name VARCHAR(100) UNIQUE NOT NULL,
                     status_name_ar VARCHAR(200) NOT NULL,
                     status_color VARCHAR(20),
-                    is_active BOOLEAN DEFAULT 1,
+                    is_active BOOLEAN DEFAULT TRUE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """))
@@ -124,11 +124,11 @@ class Database:
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS user_permissions (
                     user_id INTEGER PRIMARY KEY,
-                    can_manage_users INTEGER DEFAULT 0,
-                    can_manage_branches INTEGER DEFAULT 0,
-                    can_manage_system_vars INTEGER DEFAULT 0,
-                    can_view_reports INTEGER DEFAULT 0,
-                    can_view_requests INTEGER DEFAULT 1,
+                    can_manage_users BOOLEAN DEFAULT FALSE,
+                    can_manage_branches BOOLEAN DEFAULT FALSE,
+                    can_manage_system_vars BOOLEAN DEFAULT FALSE,
+                    can_view_reports BOOLEAN DEFAULT FALSE,
+                    can_view_requests BOOLEAN DEFAULT TRUE,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """))
@@ -140,7 +140,7 @@ class Database:
                     user_id INTEGER NOT NULL,
                     request_id INTEGER NOT NULL,
                     message TEXT NOT NULL,
-                    is_read INTEGER DEFAULT 0,
+                    is_read BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """))
@@ -347,11 +347,11 @@ class Database:
         else:
             return {
                 'user_id': user_id,
-                'can_manage_users': 0,
-                'can_manage_branches': 0,
-                'can_manage_system_vars': 0,
-                'can_view_reports': 0,
-                'can_view_requests': 1
+                'can_manage_users': False,
+                'can_manage_branches': False,
+                'can_manage_system_vars': False,
+                'can_view_reports': False,
+                'can_view_requests': True
             }
     
     def set_user_permissions(self, user_id: int, permissions: Dict) -> bool:
@@ -369,11 +369,11 @@ class Database:
                         can_view_requests = :requests, updated_at = CURRENT_TIMESTAMP
                     WHERE user_id = :id
                 """), {
-                    'users': permissions.get('can_manage_users', 0),
-                    'branches': permissions.get('can_manage_branches', 0),
-                    'vars': permissions.get('can_manage_system_vars', 0),
-                    'reports': permissions.get('can_view_reports', 0),
-                    'requests': permissions.get('can_view_requests', 1),
+                    'users': permissions.get('can_manage_users', False),
+                    'branches': permissions.get('can_manage_branches', False),
+                    'vars': permissions.get('can_manage_system_vars', False),
+                    'reports': permissions.get('can_view_reports', False),
+                    'requests': permissions.get('can_view_requests', True),
                     'id': user_id
                 })
             else:
@@ -383,11 +383,11 @@ class Database:
                     VALUES (:id, :users, :branches, :vars, :reports, :requests)
                 """), {
                     'id': user_id,
-                    'users': permissions.get('can_manage_users', 0),
-                    'branches': permissions.get('can_manage_branches', 0),
-                    'vars': permissions.get('can_manage_system_vars', 0),
-                    'reports': permissions.get('can_view_reports', 0),
-                    'requests': permissions.get('can_view_requests', 1)
+                    'users': permissions.get('can_manage_users', False),
+                    'branches': permissions.get('can_manage_branches', False),
+                    'vars': permissions.get('can_manage_system_vars', False),
+                    'reports': permissions.get('can_view_reports', False),
+                    'requests': permissions.get('can_view_requests', True)
                 })
             
             conn.commit()
@@ -428,7 +428,7 @@ class Database:
             SELECT n.*, sr.title as request_title
             FROM notifications n
             JOIN service_requests sr ON n.request_id = sr.id
-            WHERE n.user_id = :id AND n.is_read = 0
+            WHERE n.user_id = :id AND n.is_read = FALSE
             ORDER BY n.created_at DESC
             LIMIT 10
         """), {'id': user_id}).fetchall()
@@ -442,7 +442,7 @@ class Database:
         conn = self.get_connection()
         
         try:
-            conn.execute(text("UPDATE notifications SET is_read = 1 WHERE id = :id"), {'id': notif_id})
+            conn.execute(text("UPDATE notifications SET is_read = TRUE WHERE id = :id"), {'id': notif_id})
             conn.commit()
             return True
         except Exception as e:
@@ -455,7 +455,7 @@ class Database:
         """عدد الإشعارات غير المقروءة"""
         conn = self.get_connection()
         
-        result = conn.execute(text("SELECT COUNT(*) FROM notifications WHERE user_id = :id AND is_read = 0"), {'id': user_id}).fetchone()
+        result = conn.execute(text("SELECT COUNT(*) FROM notifications WHERE user_id = :id AND is_read = FALSE"), {'id': user_id}).fetchone()
         
         conn.close()
         
@@ -491,7 +491,7 @@ class Database:
                 'location': data.get('location', ''),
                 'manager': data.get('manager_name', ''),
                 'phone': data.get('contact_phone', ''),
-                'active': data.get('is_active', 1)
+                'active': data.get('is_active', True)
             })
             
             branch_id = result.fetchone()[0]
@@ -519,7 +519,7 @@ class Database:
                 'location': data.get('location', ''),
                 'manager': data.get('manager_name', ''),
                 'phone': data.get('contact_phone', ''),
-                'active': data.get('is_active', 1),
+                'active': data.get('is_active', True),
                 'id': branch_id
             })
             
@@ -536,7 +536,7 @@ class Database:
         conn = self.get_connection()
         
         try:
-            conn.execute(text("UPDATE branches SET is_active = TRUE - is_active WHERE id = :id"), {'id': branch_id})
+            conn.execute(text("UPDATE branches SET is_active = NOT is_active WHERE id = :id"), {'id': branch_id})
             conn.commit()
             return True
         except Exception as e:
@@ -588,7 +588,7 @@ class Database:
                 'role': data['role'],
                 'department': data['department'],
                 'branch_id': data.get('branch_id'),
-                'active': data.get('is_active', 1)
+                'active': data.get('is_active', True)
             })
             
             user_id = result.fetchone()[0]
@@ -618,7 +618,7 @@ class Database:
                     'role': data['role'],
                     'department': data['department'],
                     'branch_id': data.get('branch_id'),
-                    'active': data.get('is_active', 1),
+                    'active': data.get('is_active', True),
                     'password': hashed_password,
                     'id': user_id
                 })
@@ -634,7 +634,7 @@ class Database:
                     'role': data['role'],
                     'department': data['department'],
                     'branch_id': data.get('branch_id'),
-                    'active': data.get('is_active', 1),
+                    'active': data.get('is_active', True),
                     'id': user_id
                 })
             
@@ -651,7 +651,7 @@ class Database:
         conn = self.get_connection()
         
         try:
-            conn.execute(text("UPDATE users SET is_active = TRUE - is_active WHERE id = :id"), {'id': user_id})
+            conn.execute(text("UPDATE users SET is_active = NOT is_active WHERE id = :id"), {'id': user_id})
             conn.commit()
             return True
         except Exception as e:
