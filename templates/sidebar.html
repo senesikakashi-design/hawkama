@@ -161,7 +161,7 @@ function shakeBell() {
 function formatTime(datetime) {
     // تحويل من UTC إلى توقيت بغداد (UTC+3)
     const date = new Date(datetime);
-    const baghdadTime = new Date(date.getTime() + (3 * 60 * 60 * 1000)); // إضافة 3 ساعات
+    const baghdadTime = new Date(date.getTime() + (3 * 60 * 60 * 1000));
     const now = new Date();
     const diff = Math.floor((now - baghdadTime) / 1000 / 60);
     
