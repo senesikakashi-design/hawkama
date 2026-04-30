@@ -46,7 +46,7 @@ class Database:
                     role VARCHAR(50) NOT NULL,
                     department VARCHAR(100) NOT NULL,
                     branch_id INTEGER,
-                    is_active INTEGER DEFAULT 1,
+                    is_active BOOLEAN DEFAULT 1,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """))
@@ -60,7 +60,7 @@ class Database:
                     location VARCHAR(300),
                     manager_name VARCHAR(200),
                     contact_phone VARCHAR(50),
-                    is_active INTEGER DEFAULT 1,
+                    is_active BOOLEAN DEFAULT 1,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """))
@@ -91,7 +91,7 @@ class Database:
                     role_name VARCHAR(100) UNIQUE NOT NULL,
                     role_name_ar VARCHAR(200) NOT NULL,
                     description TEXT,
-                    is_active INTEGER DEFAULT 1,
+                    is_active BOOLEAN DEFAULT 1,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """))
@@ -103,7 +103,7 @@ class Database:
                     dept_name VARCHAR(100) UNIQUE NOT NULL,
                     dept_name_ar VARCHAR(200) NOT NULL,
                     description TEXT,
-                    is_active INTEGER DEFAULT 1,
+                    is_active BOOLEAN DEFAULT 1,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """))
@@ -115,7 +115,7 @@ class Database:
                     status_name VARCHAR(100) UNIQUE NOT NULL,
                     status_name_ar VARCHAR(200) NOT NULL,
                     status_color VARCHAR(20),
-                    is_active INTEGER DEFAULT 1,
+                    is_active BOOLEAN DEFAULT 1,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """))
@@ -311,7 +311,7 @@ class Database:
         
         result = conn.execute(text("""
             SELECT * FROM users 
-            WHERE username = :username AND password = :password AND is_active = 1
+            WHERE username = :username AND password = :password AND is_active = TRUE
         """), {'username': username, 'password': hashed_password}).fetchone()
         
         conn.close()
@@ -470,7 +470,7 @@ class Database:
         if include_inactive:
             result = conn.execute(text("SELECT * FROM branches ORDER BY name")).fetchall()
         else:
-            result = conn.execute(text("SELECT * FROM branches WHERE is_active = 1 ORDER BY name")).fetchall()
+            result = conn.execute(text("SELECT * FROM branches WHERE is_active = TRUE ORDER BY name")).fetchall()
         
         conn.close()
         
@@ -536,7 +536,7 @@ class Database:
         conn = self.get_connection()
         
         try:
-            conn.execute(text("UPDATE branches SET is_active = 1 - is_active WHERE id = :id"), {'id': branch_id})
+            conn.execute(text("UPDATE branches SET is_active = TRUE - is_active WHERE id = :id"), {'id': branch_id})
             conn.commit()
             return True
         except Exception as e:
@@ -561,7 +561,7 @@ class Database:
                 SELECT u.*, b.name as branch_name 
                 FROM users u
                 LEFT JOIN branches b ON u.branch_id = b.id
-                WHERE u.is_active = 1
+                WHERE u.is_active = TRUE
                 ORDER BY u.full_name
             """)).fetchall()
         
@@ -651,7 +651,7 @@ class Database:
         conn = self.get_connection()
         
         try:
-            conn.execute(text("UPDATE users SET is_active = 1 - is_active WHERE id = :id"), {'id': user_id})
+            conn.execute(text("UPDATE users SET is_active = TRUE - is_active WHERE id = :id"), {'id': user_id})
             conn.commit()
             return True
         except Exception as e:
@@ -779,7 +779,7 @@ class Database:
         """الحصول على جميع الأدوار"""
         conn = self.get_connection()
         
-        result = conn.execute(text("SELECT * FROM system_roles WHERE is_active = 1 ORDER BY role_name_ar")).fetchall()
+        result = conn.execute(text("SELECT * FROM system_roles WHERE is_active = TRUE ORDER BY role_name_ar")).fetchall()
         
         conn.close()
         
@@ -789,7 +789,7 @@ class Database:
         """الحصول على جميع الأقسام"""
         conn = self.get_connection()
         
-        result = conn.execute(text("SELECT * FROM system_departments WHERE is_active = 1 ORDER BY dept_name_ar")).fetchall()
+        result = conn.execute(text("SELECT * FROM system_departments WHERE is_active = TRUE ORDER BY dept_name_ar")).fetchall()
         
         conn.close()
         
@@ -799,7 +799,7 @@ class Database:
         """الحصول على جميع الحالات"""
         conn = self.get_connection()
         
-        result = conn.execute(text("SELECT * FROM system_statuses WHERE is_active = 1 ORDER BY id")).fetchall()
+        result = conn.execute(text("SELECT * FROM system_statuses WHERE is_active = TRUE ORDER BY id")).fetchall()
         
         conn.close()
         
@@ -876,10 +876,10 @@ class Database:
             result = conn.execute(text("SELECT COUNT(*) FROM service_requests WHERE status = 'completed'")).fetchone()
             stats['completed_requests'] = result[0]
             
-            result = conn.execute(text("SELECT COUNT(*) FROM branches WHERE is_active = 1")).fetchone()
+            result = conn.execute(text("SELECT COUNT(*) FROM branches WHERE is_active = TRUE")).fetchone()
             stats['total_branches'] = result[0]
             
-            result = conn.execute(text("SELECT COUNT(*) FROM users WHERE is_active = 1")).fetchone()
+            result = conn.execute(text("SELECT COUNT(*) FROM users WHERE is_active = TRUE")).fetchone()
             stats['total_users'] = result[0]
         
         conn.close()
