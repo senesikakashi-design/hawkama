@@ -10,7 +10,7 @@ from typing import Dict, List, Optional
 class Database:
     """إدارة قاعدة البيانات"""
     
-    def __init__(self, db_path: str = "workflow.db"):
+    def __init__(self, db_path: str = "workflow_v4.db"):
         self.db_path = db_path
         self.init_database()
     
