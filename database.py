@@ -294,6 +294,7 @@ class Database:
             'can_view_reports': False,
             'can_manage_system_vars': False
         }
+        
         def add_user(self, data):
         """إضافة مستخدم جديد"""
         conn = self.get_connection()
