@@ -428,7 +428,32 @@ class Database:
             raise e
         finally:
             conn.close()
-    
+
+    def create_branch(self, data):
+        """إنشاء فرع جديد"""
+        conn = self.get_connection()
+        
+        try:
+            conn.execute(text("""
+                INSERT INTO branches (code, name, city, address, phone, manager_name, is_active)
+                VALUES (:code, :name, :city, :address, :phone, :manager, TRUE)
+            """), {
+                'code': data['code'],
+                'name': data['name'],
+                'city': data['city'],
+                'address': data.get('address', ''),
+                'phone': data.get('phone', ''),
+                'manager': data.get('manager_name', '')
+            })
+            
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+            
     def get_all_requests(self, user=None, status=None):
         """الحصول على كل الطلبات"""
         conn = self.get_connection()
