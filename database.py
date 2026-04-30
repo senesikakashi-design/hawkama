@@ -30,6 +30,16 @@ class Database:
             return None
         return {key: value for key, value in row._mapping.items()}
     
+    def _to_bool(self, value):
+        """تحويل القيمة إلى boolean"""
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, int):
+            return value == 1
+        if isinstance(value, str):
+            return value.lower() in ('true', '1', 'yes')
+        return bool(value)
+    
     def init_database(self):
         """تهيئة قاعدة البيانات"""
         conn = self.get_connection()
@@ -369,11 +379,11 @@ class Database:
                         can_view_requests = :requests, updated_at = CURRENT_TIMESTAMP
                     WHERE user_id = :id
                 """), {
-                    'users': permissions.get('can_manage_users', False),
-                    'branches': permissions.get('can_manage_branches', False),
-                    'vars': permissions.get('can_manage_system_vars', False),
-                    'reports': permissions.get('can_view_reports', False),
-                    'requests': permissions.get('can_view_requests', True),
+                    'users': self._to_bool(permissions.get('can_manage_users', False)),
+                    'branches': self._to_bool(permissions.get('can_manage_branches', False)),
+                    'vars': self._to_bool(permissions.get('can_manage_system_vars', False)),
+                    'reports': self._to_bool(permissions.get('can_view_reports', False)),
+                    'requests': self._to_bool(permissions.get('can_view_requests', True)),
                     'id': user_id
                 })
             else:
@@ -383,11 +393,11 @@ class Database:
                     VALUES (:id, :users, :branches, :vars, :reports, :requests)
                 """), {
                     'id': user_id,
-                    'users': permissions.get('can_manage_users', False),
-                    'branches': permissions.get('can_manage_branches', False),
-                    'vars': permissions.get('can_manage_system_vars', False),
-                    'reports': permissions.get('can_view_reports', False),
-                    'requests': permissions.get('can_view_requests', True)
+                    'users': self._to_bool(permissions.get('can_manage_users', False)),
+                    'branches': self._to_bool(permissions.get('can_manage_branches', False)),
+                    'vars': self._to_bool(permissions.get('can_manage_system_vars', False)),
+                    'reports': self._to_bool(permissions.get('can_view_reports', False)),
+                    'requests': self._to_bool(permissions.get('can_view_requests', True))
                 })
             
             conn.commit()
@@ -491,7 +501,7 @@ class Database:
                 'location': data.get('location', ''),
                 'manager': data.get('manager_name', ''),
                 'phone': data.get('contact_phone', ''),
-                'active': data.get('is_active', True)
+                'active': self._to_bool(data.get('is_active', True))
             })
             
             branch_id = result.fetchone()[0]
@@ -519,7 +529,7 @@ class Database:
                 'location': data.get('location', ''),
                 'manager': data.get('manager_name', ''),
                 'phone': data.get('contact_phone', ''),
-                'active': data.get('is_active', True),
+                'active': self._to_bool(data.get('is_active', True)),
                 'id': branch_id
             })
             
@@ -587,8 +597,8 @@ class Database:
                 'email': data.get('email', ''),
                 'role': data['role'],
                 'department': data['department'],
-                'branch_id': data.get('branch_id'),
-                'active': data.get('is_active', True)
+                'branch_id': int(data['branch_id']) if data.get('branch_id') else None,
+                'active': self._to_bool(data.get('is_active', True))
             })
             
             user_id = result.fetchone()[0]
@@ -617,8 +627,8 @@ class Database:
                     'email': data.get('email', ''),
                     'role': data['role'],
                     'department': data['department'],
-                    'branch_id': data.get('branch_id'),
-                    'active': data.get('is_active', True),
+                    'branch_id': int(data['branch_id']) if data.get('branch_id') else None,
+                    'active': self._to_bool(data.get('is_active', True)),
                     'password': hashed_password,
                     'id': user_id
                 })
@@ -633,8 +643,8 @@ class Database:
                     'email': data.get('email', ''),
                     'role': data['role'],
                     'department': data['department'],
-                    'branch_id': data.get('branch_id'),
-                    'active': data.get('is_active', True),
+                    'branch_id': int(data['branch_id']) if data.get('branch_id') else None,
+                    'active': self._to_bool(data.get('is_active', True)),
                     'id': user_id
                 })
             
@@ -744,7 +754,7 @@ class Database:
                 'priority': data.get('priority', 'medium'),
                 'created_by': data['created_by'],
                 'dept': data.get('department', ''),
-                'branch_id': data.get('branch_id')
+                'branch_id': int(data['branch_id']) if data.get('branch_id') else None
             })
             
             request_id = result.fetchone()[0]
