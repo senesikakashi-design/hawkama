@@ -689,3 +689,33 @@ class Database:
             conn.commit()
         finally:
             conn.close()
+    
+    def get_all_statuses(self):
+        """الحصول على كل حالات الطلبات"""
+        return [
+            {'status_name': 'pending', 'status_name_ar': 'قيد الانتظار'},
+            {'status_name': 'in_progress', 'status_name_ar': 'قيد التنفيذ'},
+            {'status_name': 'completed', 'status_name_ar': 'مكتمل'},
+            {'status_name': 'rejected', 'status_name_ar': 'مرفوض'},
+            {'status_name': 'cancelled', 'status_name_ar': 'ملغى'}
+        ]
+    
+    def get_all_priorities(self):
+        """الحصول على كل مستويات الأولوية"""
+        return [
+            {'priority_name': 'low', 'priority_name_ar': 'منخفض'},
+            {'priority_name': 'medium', 'priority_name_ar': 'متوسط'},
+            {'priority_name': 'high', 'priority_name_ar': 'عالي'},
+            {'priority_name': 'urgent', 'priority_name_ar': 'عاجل'}
+        ]
+    
+    def get_all_request_types(self):
+        """الحصول على كل أنواع الطلبات"""
+        return [
+            {'type_name': 'compliance_check', 'type_name_ar': 'فحص امتثال'},
+            {'type_name': 'branch_inspection', 'type_name_ar': 'تفتيش فرع'},
+            {'type_name': 'document_review', 'type_name_ar': 'مراجعة وثائق'},
+            {'type_name': 'audit', 'type_name_ar': 'تدقيق'},
+            {'type_name': 'training', 'type_name_ar': 'تدريب'},
+            {'type_name': 'other', 'type_name_ar': 'أخرى'}
+        ]
