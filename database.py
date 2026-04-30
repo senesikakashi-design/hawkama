@@ -1,746 +1,829 @@
 """
-إدارة قاعدة البيانات - PostgreSQL (Supabase)
+Database Management Module - v4.0 with Permissions & Notifications
 """
 
-import os
-from sqlalchemy import create_engine, text
-from sqlalchemy.pool import NullPool
-import bcrypt
+import sqlite3
+import hashlib
 from datetime import datetime
+from typing import Dict, List, Optional
 
 class Database:
     """إدارة قاعدة البيانات"""
     
-    def __init__(self):
-        database_url = os.environ.get('DATABASE_URL')
-        if not database_url:
-            raise Exception("DATABASE_URL not found!")
-        
-        self.engine = create_engine(database_url, poolclass=NullPool)
+    def __init__(self, db_path: str = "workflow_v4.db"):
+        self.db_path = db_path
         self.init_database()
     
     def get_connection(self):
-        return self.engine.connect()
-    
-    def _row_to_dict(self, row):
-        """تحويل Row إلى dict"""
-        if row is None:
-            return None
-        return {key: value for key, value in row._mapping.items()}
+        """إنشاء اتصال بقاعدة البيانات"""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        return conn
     
     def init_database(self):
-        """إنشاء الجداول"""
+        """تهيئة قاعدة البيانات"""
         conn = self.get_connection()
+        cursor = conn.cursor()
         
-        try:
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS users (
-                    id SERIAL PRIMARY KEY,
-                    username VARCHAR(100) UNIQUE NOT NULL,
-                    password VARCHAR(255) NOT NULL,
-                    full_name VARCHAR(200) NOT NULL,
-                    email VARCHAR(200),
-                    role VARCHAR(50) NOT NULL,
-                    department VARCHAR(100),
-                    branch_id INTEGER,
-                    is_active BOOLEAN DEFAULT TRUE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """))
-            
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS branches (
-                    id SERIAL PRIMARY KEY,
-                    code VARCHAR(20) UNIQUE NOT NULL,
-                    name VARCHAR(200) NOT NULL,
-                    city VARCHAR(100) NOT NULL,
-                    address VARCHAR(300),
-                    phone VARCHAR(50),
-                    manager_name VARCHAR(200),
-                    is_active BOOLEAN DEFAULT TRUE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """))
-            
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS requests (
-                    id SERIAL PRIMARY KEY,
-                    title VARCHAR(300) NOT NULL,
-                    description TEXT,
-                    request_type VARCHAR(100) NOT NULL,
-                    priority VARCHAR(50) DEFAULT 'medium',
-                    status VARCHAR(50) DEFAULT 'pending',
-                    created_by INTEGER NOT NULL,
-                    assigned_to INTEGER,
-                    branch_id INTEGER,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """))
-            
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS comments (
-                    id SERIAL PRIMARY KEY,
-                    request_id INTEGER NOT NULL,
-                    user_id INTEGER NOT NULL,
-                    comment TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """))
-            
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS user_permissions (
-                    id SERIAL PRIMARY KEY,
-                    user_id INTEGER UNIQUE NOT NULL,
-                    can_manage_users BOOLEAN DEFAULT FALSE,
-                    can_manage_branches BOOLEAN DEFAULT FALSE,
-                    can_view_requests BOOLEAN DEFAULT FALSE,
-                    can_view_reports BOOLEAN DEFAULT FALSE,
-                    can_manage_system_vars BOOLEAN DEFAULT FALSE
-                )
-            """))
-            
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS notifications (
-                    id SERIAL PRIMARY KEY,
-                    user_id INTEGER NOT NULL,
-                    request_id INTEGER,
-                    message TEXT NOT NULL,
-                    is_read BOOLEAN DEFAULT FALSE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """))
-            
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS system_variables (
-                    id SERIAL PRIMARY KEY,
-                    var_name VARCHAR(100) UNIQUE NOT NULL,
-                    var_value TEXT,
-                    var_type VARCHAR(50),
-                    description TEXT,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """))
-            
-            conn.commit()
-            self.create_default_data(conn)
-            
-        except Exception as e:
-            conn.rollback()
-            print(f"Database Error: {e}")
-        finally:
-            conn.close()
-    
-    def create_default_data(self, conn):
-        """البيانات الأساسية"""
-        result = conn.execute(text("SELECT COUNT(*) as count FROM users")).fetchone()
+        # جدول المستخدمين
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                full_name TEXT NOT NULL,
+                email TEXT,
+                role TEXT NOT NULL,
+                department TEXT NOT NULL,
+                branch_id INTEGER,
+                is_active INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (branch_id) REFERENCES branches(id)
+            )
+        """)
         
-        if result[0] == 0:
-            default_users = [
-                ('compliance', 'compliance123', 'مسؤول الامتثال', 'compliance@hawkama.iq', 'compliance_officer', 'Compliance'),
-                ('gm', 'gm123', 'المدير العام', 'gm@hawkama.iq', 'general_manager', 'Management'),
-                ('it_manager', 'it123', 'مدير تقنية المعلومات', 'it@hawkama.iq', 'department_head', 'IT')
-            ]
-            
-            for username, password, full_name, email, role, dept in default_users:
-                hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-                conn.execute(text("""
-                    INSERT INTO users (username, password, full_name, email, role, department, is_active)
-                    VALUES (:username, :password, :full_name, :email, :role, :department, TRUE)
-                """), {
-                    'username': username,
-                    'password': hashed.decode('utf-8'),
-                    'full_name': full_name,
-                    'email': email,
-                    'role': role,
-                    'department': dept
-                })
-            
-            conn.commit()
+        # جدول الفروع
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS branches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                code TEXT UNIQUE NOT NULL,
+                location TEXT,
+                manager_name TEXT,
+                contact_phone TEXT,
+                is_active INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
         
-        result = conn.execute(text("SELECT COUNT(*) as count FROM branches")).fetchone()
+        # جدول الطلبات
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS service_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                request_type TEXT NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT,
+                priority TEXT DEFAULT 'medium',
+                status TEXT DEFAULT 'pending',
+                created_by INTEGER NOT NULL,
+                assigned_to INTEGER,
+                department TEXT,
+                branch_id INTEGER,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (created_by) REFERENCES users(id),
+                FOREIGN KEY (branch_id) REFERENCES branches(id)
+            )
+        """)
         
-        if result[0] == 0:
-            branches = [
-                ('HQ-001', 'المقر الرئيسي - HQ', 'بغداد - المنصور', '07700000001', 'إدارة المقر'),
-                ('SAD-001', 'فرع السعدون', 'بغداد - السعدون', '07700000002', 'مدير السعدون'),
-                ('HAR-001', 'فرع الحارثية', 'بغداد - الحارثية', '07700000003', 'مدير الحارثية'),
-                ('SAY-001', 'فرع السيدية', 'بغداد - السيدية', '07700000004', 'مدير السيدية'),
-                ('ZAY-001', 'فرع زيونة', 'بغداد - زيونة', '07700000005', 'مدير زيونة'),
-                ('DRA-001', 'فرع الدورة', 'بغداد - الدورة', '07700000006', 'مدير الدورة'),
-                ('KRB-001', 'فرع كربلاء', 'كربلاء', '07700000007', 'مدير كربلاء'),
-                ('BAB-001', 'فرع بابل', 'بابل - الحلة', '07700000008', 'مدير بابل'),
-                ('BSR-001', 'فرع البصرة', 'البصرة - العشار', '07700000009', 'مدير البصرة'),
-                ('KRK-001', 'فرع كركوك', 'كركوك', '07700000010', 'مدير كركوك'),
-                ('ERB-001', 'فرع أربيل', 'أربيل', '07700000011', 'مدير أربيل'),
-                ('TIK-001', 'فرع تكريت', 'تكريت - صلاح الدين', '07700000012', 'مدير تكريت'),
-                ('MNS-001', 'فرع المنصور', 'بغداد - المنصور', '07700000013', 'مدير المنصور'),
-                ('MSL-001', 'فرع الموصل', 'الموصل - نينوى', '07700000014', 'مدير الموصل'),
-                ('MYS-001', 'فرع ميسلون', 'بغداد - ميسلون', '07700000015', 'مدير ميسلون'),
-                ('SLM-001', 'فرع السليمانية', 'السليمانية', '07700000016', 'مدير السليمانية'),
-                ('NAJ-001', 'فرع النجف', 'النجف', '07700000017', 'مدير النجف'),
-                ('FAL-001', 'فرع الفلوجة', 'الفلوجة - الأنبار', '07700000018', 'مدير الفلوجة')
-            ]
-            
-            for code, name, city, phone, manager in branches:
-                conn.execute(text("""
-                    INSERT INTO branches (code, name, city, phone, manager_name, is_active)
-                    VALUES (:code, :name, :city, :phone, :manager, TRUE)
-                """), {
-                    'code': code,
-                    'name': name,
-                    'city': city,
-                    'phone': phone,
-                    'manager': manager
-                })
-            
-            conn.commit()
-    
-    def get_user_by_username(self, username):
-        """الحصول على مستخدم"""
-        conn = self.get_connection()
-        result = conn.execute(
-            text("SELECT * FROM users WHERE username = :username"),
-            {'username': username}
-        ).fetchone()
+        # جدول الأدوار
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS system_roles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                role_name TEXT UNIQUE NOT NULL,
+                role_name_ar TEXT NOT NULL,
+                description TEXT,
+                is_active INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # جدول الأقسام
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS system_departments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                dept_name TEXT UNIQUE NOT NULL,
+                dept_name_ar TEXT NOT NULL,
+                description TEXT,
+                is_active INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # جدول الحالات
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS system_statuses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                status_name TEXT UNIQUE NOT NULL,
+                status_name_ar TEXT NOT NULL,
+                status_color TEXT,
+                is_active INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # جدول الصلاحيات - جديد!
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_permissions (
+                user_id INTEGER PRIMARY KEY,
+                can_manage_users INTEGER DEFAULT 0,
+                can_manage_branches INTEGER DEFAULT 0,
+                can_manage_system_vars INTEGER DEFAULT 0,
+                can_view_reports INTEGER DEFAULT 0,
+                can_view_requests INTEGER DEFAULT 1,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+        
+        # جدول الإشعارات - جديد!
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS notifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                request_id INTEGER NOT NULL,
+                message TEXT NOT NULL,
+                is_read INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (request_id) REFERENCES service_requests(id)
+            )
+        """)
+        
+        conn.commit()
+        
+        # إضافة بيانات افتراضية
+        self._create_default_branches(conn)
+        self._create_default_users(conn)
+        self._create_default_roles(conn)
+        self._create_default_departments(conn)
+        self._create_default_statuses(conn)
+        
         conn.close()
-        return self._row_to_dict(result)
     
-    def get_user_by_id(self, user_id):
-        """الحصول على مستخدم بالمعرف"""
-        conn = self.get_connection()
-        result = conn.execute(
-            text("SELECT * FROM users WHERE id = :id"),
-            {'id': user_id}
-        ).fetchone()
-        conn.close()
-        return self._row_to_dict(result)
+    def _create_default_branches(self, conn):
+        """إنشاء الفروع الـ 18"""
+        cursor = conn.cursor()
+        
+        branches = [
+            ('HQ - المقر الرئيسي', 'HQ-001', 'بغداد - المنصور', 'إدارة المقر', '07700000001'),
+            ('فرع السعودن', 'SVD-001', 'بغداد - السعودن', 'مدير السعودن', '07700000002'),
+            ('فرع الحارثية', 'HAR-001', 'بغداد - الحارثية', 'مدير الحارثية', '07700000003'),
+            ('فرع السيدية', 'SYD-001', 'بغداد - السيدية', 'مدير السيدية', '07700000004'),
+            ('فرع زيونة', 'ZYN-001', 'بغداد - زيونة', 'مدير زيونة', '07700000005'),
+            ('فرع الدورة', 'DRA-001', 'بغداد - الدورة', 'مدير الدورة', '07700000006'),
+            ('فرع كربلاء', 'KRB-001', 'كربلاء المقدسة', 'مدير كربلاء', '07700000007'),
+            ('فرع بابل', 'BBL-001', 'بابل - الحلة', 'مدير بابل', '07700000008'),
+            ('فرع البصرة', 'BSR-001', 'البصرة - العشار', 'مدير البصرة', '07700000009'),
+            ('فرع كركوك', 'KRK-001', 'كركوك', 'مدير كركوك', '07700000010'),
+            ('فرع أربيل', 'ERB-001', 'أربيل', 'مدير أربيل', '07700000011'),
+            ('فرع تكريت', 'TKR-001', 'صلاح الدين - تكريت', 'مدير تكريت', '07700000012'),
+            ('فرع المنصور', 'MNS-001', 'بغداد - المنصور', 'مدير المنصور', '07700000013'),
+            ('فرع الموصل', 'MSL-001', 'نينوى - الموصل', 'مدير الموصل', '07700000014'),
+            ('فرع ميسان', 'MYS-001', 'ميسان - العمارة', 'مدير ميسان', '07700000015'),
+            ('فرع السليمانية', 'SLM-001', 'السليمانية', 'مدير السليمانية', '07700000016'),
+            ('فرع النجف', 'NJF-001', 'النجف الأشرف', 'مدير النجف', '07700000017'),
+            ('فرع الفلوجة', 'FLJ-001', 'الأنبار - الفلوجة', 'مدير الفلوجة', '07700000018'),
+        ]
+        
+        for branch in branches:
+            try:
+                cursor.execute("""
+                    INSERT INTO branches (name, code, location, manager_name, contact_phone)
+                    VALUES (?, ?, ?, ?, ?)
+                """, branch)
+            except sqlite3.IntegrityError:
+                pass
+        
+        conn.commit()
     
-    def verify_password(self, plain_password, hashed_password):
-        """التحقق من كلمة المرور"""
-        return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+    def _create_default_users(self, conn):
+        """إنشاء مستخدمين افتراضيين"""
+        cursor = conn.cursor()
+        
+        default_users = [
+            ('compliance', self.hash_password('compliance123'), 'مسؤول الامتثال', 'compliance@company.iq', 'compliance_officer', 'Compliance', 1),
+            ('gm', self.hash_password('gm123'), 'المدير العام', 'gm@company.iq', 'general_manager', 'Management', 1),
+            ('it_manager', self.hash_password('it123'), 'مدير IT', 'it@company.iq', 'department_head', 'IT', 1),
+        ]
+        
+        for user in default_users:
+            try:
+                cursor.execute("""
+                    INSERT INTO users (username, password, full_name, email, role, department, branch_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, user)
+            except sqlite3.IntegrityError:
+                pass
+        
+        conn.commit()
     
-    def verify_login(self, username, password):
+    def _create_default_roles(self, conn):
+        """إنشاء الأدوار الافتراضية"""
+        cursor = conn.cursor()
+        
+        roles = [
+            ('compliance_officer', 'مسؤول الامتثال', 'صلاحيات كاملة'),
+            ('general_manager', 'مدير عام', 'إدارة الفروع والتقارير'),
+            ('department_head', 'رئيس قسم', 'إدارة القسم'),
+            ('employee', 'موظف', 'طلبات فقط'),
+        ]
+        
+        for role in roles:
+            try:
+                cursor.execute("""
+                    INSERT INTO system_roles (role_name, role_name_ar, description)
+                    VALUES (?, ?, ?)
+                """, role)
+            except sqlite3.IntegrityError:
+                pass
+        
+        conn.commit()
+    
+    def _create_default_departments(self, conn):
+        """إنشاء الأقسام الافتراضية"""
+        cursor = conn.cursor()
+        
+        departments = [
+            ('IT', 'تقنية المعلومات', 'قسم IT'),
+            ('HR', 'الموارد البشرية', 'قسم HR'),
+            ('Finance', 'المالية', 'قسم المالية'),
+            ('Operations', 'العمليات', 'قسم العمليات'),
+            ('Sales', 'المبيعات', 'قسم المبيعات'),
+            ('Compliance', 'الامتثال', 'قسم الامتثال'),
+            ('Management', 'الإدارة', 'الإدارة العليا'),
+        ]
+        
+        for dept in departments:
+            try:
+                cursor.execute("""
+                    INSERT INTO system_departments (dept_name, dept_name_ar, description)
+                    VALUES (?, ?, ?)
+                """, dept)
+            except sqlite3.IntegrityError:
+                pass
+        
+        conn.commit()
+    
+    def _create_default_statuses(self, conn):
+        """إنشاء حالات الطلبات"""
+        cursor = conn.cursor()
+        
+        statuses = [
+            ('pending', 'قيد المعالجة', '#ff9800'),
+            ('in_progress', 'قيد الإنجاز', '#ffc107'),
+            ('completed', 'منجز', '#4caf50'),
+            ('approved', 'موافق عليه', '#2196f3'),
+            ('rejected', 'مرفوض', '#f44336'),
+        ]
+        
+        for status in statuses:
+            try:
+                cursor.execute("""
+                    INSERT INTO system_statuses (status_name, status_name_ar, status_color)
+                    VALUES (?, ?, ?)
+                """, status)
+            except sqlite3.IntegrityError:
+                pass
+        
+        conn.commit()
+    
+    @staticmethod
+    def hash_password(password: str) -> str:
+        """تشفير كلمة المرور"""
+        return hashlib.sha256(password.encode()).hexdigest()
+    
+    def verify_login(self, username: str, password: str) -> Optional[Dict]:
         """التحقق من تسجيل الدخول"""
-        user = self.get_user_by_username(username)
+        conn = self.get_connection()
+        cursor = conn.cursor()
         
-        if user and user['is_active']:
-            if self.verify_password(password, user['password']):
-                return user
+        hashed_password = self.hash_password(password)
         
+        cursor.execute("""
+            SELECT * FROM users 
+            WHERE username = ? AND password = ? AND is_active = 1
+        """, (username, hashed_password))
+        
+        user = cursor.fetchone()
+        conn.close()
+        
+        if user:
+            return dict(user)
         return None
     
-    def get_all_branches(self, include_inactive=False):
-        """الحصول على كل الفروع"""
+    def get_user_by_id(self, user_id: int) -> Optional[Dict]:
+        """الحصول على مستخدم بالمعرف"""
         conn = self.get_connection()
+        cursor = conn.cursor()
         
-        if include_inactive:
-            query = "SELECT * FROM branches ORDER BY name"
-        else:
-            query = "SELECT * FROM branches WHERE is_active = TRUE ORDER BY name"
-        
-        result = conn.execute(text(query)).fetchall()
+        cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+        user = cursor.fetchone()
         conn.close()
-        return [self._row_to_dict(row) for row in result]
-    
-    def toggle_branch_status(self, branch_id):
-        """تبديل حالة الفرع"""
-        conn = self.get_connection()
-        conn.execute(
-            text("UPDATE branches SET is_active = NOT is_active WHERE id = :id"),
-            {'id': branch_id}
-        )
-        conn.commit()
-        conn.close()
-        return True
-    
-    def get_all_users(self, include_inactive=False):
-        """الحصول على كل المستخدمين"""
-        conn = self.get_connection()
         
-        query = """
-            SELECT u.*, b.name as branch_name 
-            FROM users u 
-            LEFT JOIN branches b ON u.branch_id = b.id
-        """
-        
-        if not include_inactive:
-            query += " WHERE u.is_active = TRUE"
-        
-        query += " ORDER BY u.full_name"
-        
-        result = conn.execute(text(query)).fetchall()
-        conn.close()
-        return [self._row_to_dict(row) for row in result]
+        if user:
+            return dict(user)
+        return None
     
-    def toggle_user_status(self, user_id):
-        """تبديل حالة المستخدم"""
-        conn = self.get_connection()
-        conn.execute(
-            text("UPDATE users SET is_active = NOT is_active WHERE id = :id"),
-            {'id': user_id}
-        )
-        conn.commit()
-        conn.close()
-        return True
+    # ==================== الصلاحيات - جديد! ====================
     
-    def delete_user(self, user_id):
-        """حذف مستخدم نهائياً"""
-        conn = self.get_connection()
-        
-        try:
-            conn.execute(text("DELETE FROM user_permissions WHERE user_id = :id"), {'id': user_id})
-            conn.execute(text("DELETE FROM notifications WHERE user_id = :id"), {'id': user_id})
-            conn.execute(text("DELETE FROM users WHERE id = :id"), {'id': user_id})
-            conn.commit()
-            return True
-        except Exception as e:
-            conn.rollback()
-            raise e
-        finally:
-            conn.close()
-    
-    def get_user_permissions(self, user_id):
+    def get_user_permissions(self, user_id: int) -> Dict:
         """الحصول على صلاحيات المستخدم"""
         conn = self.get_connection()
-        result = conn.execute(
-            text("SELECT * FROM user_permissions WHERE user_id = :id"),
-            {'id': user_id}
-        ).fetchone()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM user_permissions WHERE user_id = ?", (user_id,))
+        perms = cursor.fetchone()
         conn.close()
         
-        if result:
-            return self._row_to_dict(result)
-        
-        return {
-            'can_manage_users': False,
-            'can_manage_branches': False,
-            'can_view_requests': False,
-            'can_view_reports': False,
-            'can_manage_system_vars': False
-        }
-    
-    def add_user(self, data):
-        """إضافة مستخدم جديد"""
-        conn = self.get_connection()
-        
-        try:
-            hashed = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt())
-            
-            conn.execute(text("""
-                INSERT INTO users (username, password, full_name, email, role, department, branch_id, is_active)
-                VALUES (:username, :password, :full_name, :email, :role, :department, :branch_id, TRUE)
-            """), {
-                'username': data['username'],
-                'password': hashed.decode('utf-8'),
-                'full_name': data['full_name'],
-                'email': data.get('email', ''),
-                'role': data['role'],
-                'department': data['department'],
-                'branch_id': data.get('branch_id')
-            })
-            
-            conn.commit()
-            return True
-        except Exception as e:
-            conn.rollback()
-            raise e
-        finally:
-            conn.close()
-    
-    def update_user(self, user_id, data):
-        """تحديث مستخدم"""
-        conn = self.get_connection()
-        
-        try:
-            query = """
-                UPDATE users 
-                SET full_name = :full_name, 
-                    email = :email, 
-                    role = :role, 
-                    department = :department, 
-                    branch_id = :branch_id,
-                    is_active = :is_active
-            """
-            
-            params = {
-                'full_name': data['full_name'],
-                'email': data.get('email', ''),
-                'role': data['role'],
-                'department': data['department'],
-                'branch_id': data.get('branch_id'),
-                'is_active': data.get('is_active', True),
-                'user_id': user_id
+        if perms:
+            return dict(perms)
+        else:
+            # صلاحيات افتراضية
+            return {
+                'user_id': user_id,
+                'can_manage_users': 0,
+                'can_manage_branches': 0,
+                'can_manage_system_vars': 0,
+                'can_view_reports': 0,
+                'can_view_requests': 1
             }
-            
-            if 'password' in data and data['password']:
-                hashed = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt())
-                query += ", password = :password"
-                params['password'] = hashed.decode('utf-8')
-            
-            query += " WHERE id = :user_id"
-            
-            conn.execute(text(query), params)
-            conn.commit()
-            return True
-        except Exception as e:
-            conn.rollback()
-            raise e
-        finally:
-            conn.close()
     
-    def get_branch_by_id(self, branch_id):
-        """الحصول على فرع"""
+    def set_user_permissions(self, user_id: int, permissions: Dict) -> bool:
+        """تعيين صلاحيات المستخدم"""
         conn = self.get_connection()
-        result = conn.execute(
-            text("SELECT * FROM branches WHERE id = :id"),
-            {'id': branch_id}
-        ).fetchone()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            INSERT OR REPLACE INTO user_permissions 
+            (user_id, can_manage_users, can_manage_branches, can_manage_system_vars, can_view_reports, can_view_requests, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        """, (
+            user_id,
+            permissions.get('can_manage_users', 0),
+            permissions.get('can_manage_branches', 0),
+            permissions.get('can_manage_system_vars', 0),
+            permissions.get('can_view_reports', 0),
+            permissions.get('can_view_requests', 1)
+        ))
+        
+        conn.commit()
         conn.close()
-        return self._row_to_dict(result)
-    
-    def update_branch(self, branch_id, data):
-        """تحديث فرع"""
-        conn = self.get_connection()
         
-        try:
-            conn.execute(text("""
-                UPDATE branches 
-                SET name = :name, 
-                    city = :city, 
-                    address = :address, 
-                    phone = :phone, 
-                    manager_name = :manager
-                WHERE id = :id
-            """), {
-                'name': data['name'],
-                'city': data['city'],
-                'address': data.get('address', ''),
-                'phone': data.get('phone', ''),
-                'manager': data.get('manager_name', ''),
-                'id': branch_id
-            })
-            
-            conn.commit()
-            return True
-        except Exception as e:
-            conn.rollback()
-            raise e
-        finally:
-            conn.close()
-
-    def create_branch(self, data):
-        """إنشاء فرع جديد"""
-        conn = self.get_connection()
-        
-        try:
-            conn.execute(text("""
-                INSERT INTO branches (code, name, city, address, phone, manager_name, is_active)
-                VALUES (:code, :name, :city, :address, :phone, :manager, TRUE)
-            """), {
-                'code': data['code'],
-                'name': data['name'],
-                'city': data['city'],
-                'address': data.get('address', ''),
-                'phone': data.get('phone', ''),
-                'manager': data.get('manager_name', '')
-            })
-            
-            conn.commit()
-            return True
-        except Exception as e:
-            conn.rollback()
-            raise e
-        finally:
-            conn.close()
-            
-    def get_all_requests(self, user=None, status=None):
-        """الحصول على كل الطلبات"""
-        conn = self.get_connection()
-        
-        query = """
-            SELECT r.*, 
-                   u1.full_name as creator_name,
-                   u2.full_name as assignee_name,
-                   b.name as branch_name
-            FROM requests r
-            LEFT JOIN users u1 ON r.created_by = u1.id
-            LEFT JOIN users u2 ON r.assigned_to = u2.id
-            LEFT JOIN branches b ON r.branch_id = b.id
-            ORDER BY r.created_at DESC
-        """
-        
-        result = conn.execute(text(query)).fetchall()
-        conn.close()
-        return [self._row_to_dict(row) for row in result]
-    
-    def get_request_by_id(self, request_id):
-        """الحصول على طلب"""
-        conn = self.get_connection()
-        result = conn.execute(
-            text("""
-                SELECT r.*, 
-                       u1.full_name as creator_name,
-                       u2.full_name as assignee_name,
-                       b.name as branch_name
-                FROM requests r
-                LEFT JOIN users u1 ON r.created_by = u1.id
-                LEFT JOIN users u2 ON r.assigned_to = u2.id
-                LEFT JOIN branches b ON r.branch_id = b.id
-                WHERE r.id = :id
-            """),
-            {'id': request_id}
-        ).fetchone()
-        conn.close()
-        return self._row_to_dict(result)
-    
-    def create_request(self, data):
-        """إنشاء طلب جديد"""
-        conn = self.get_connection()
-        
-        try:
-            result = conn.execute(text("""
-                INSERT INTO requests (title, description, request_type, priority, status, created_by, assigned_to, branch_id, created_at, updated_at)
-                VALUES (:title, :description, :request_type, :priority, :status, :created_by, :assigned_to, :branch_id, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                RETURNING id
-            """), {
-                'title': data['title'],
-                'description': data.get('description', ''),
-                'request_type': data['request_type'],
-                'priority': data.get('priority', 'medium'),
-                'status': 'pending',
-                'created_by': data['created_by'],
-                'assigned_to': data.get('assigned_to'),
-                'branch_id': data.get('branch_id')
-            })
-            
-            request_id = result.fetchone()[0]
-            conn.commit()
-            return request_id
-        except Exception as e:
-            conn.rollback()
-            raise e
-        finally:
-            conn.close()
-    
-    def update_request(self, request_id, data):
-        """تحديث طلب"""
-        conn = self.get_connection()
-        
-        try:
-            conn.execute(text("""
-                UPDATE requests 
-                SET title = :title,
-                    description = :description,
-                    request_type = :request_type,
-                    priority = :priority,
-                    status = :status,
-                    assigned_to = :assigned_to,
-                    branch_id = :branch_id,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = :id
-            """), {
-                'title': data['title'],
-                'description': data.get('description', ''),
-                'request_type': data['request_type'],
-                'priority': data.get('priority', 'medium'),
-                'status': data.get('status', 'pending'),
-                'assigned_to': data.get('assigned_to'),
-                'branch_id': data.get('branch_id'),
-                'id': request_id
-            })
-            
-            conn.commit()
-            return True
-        except Exception as e:
-            conn.rollback()
-            raise e
-        finally:
-            conn.close()
-    
-    def get_all_system_vars(self):
-        """الحصول على كل متغيرات النظام"""
-        conn = self.get_connection()
-        result = conn.execute(text("SELECT * FROM system_variables ORDER BY var_name")).fetchall()
-        conn.close()
-        return [self._row_to_dict(row) for row in result]
-    
-    def get_system_var(self, var_name):
-        """الحصول على متغير نظام"""
-        conn = self.get_connection()
-        result = conn.execute(
-            text("SELECT * FROM system_variables WHERE var_name = :name"),
-            {'name': var_name}
-        ).fetchone()
-        conn.close()
-        return self._row_to_dict(result)
-    
-    def set_system_var(self, var_name, var_value, var_type='string', description=''):
-        """تعيين متغير نظام"""
-        conn = self.get_connection()
-        
-        try:
-            existing = conn.execute(
-                text("SELECT id FROM system_variables WHERE var_name = :name"),
-                {'name': var_name}
-            ).fetchone()
-            
-            if existing:
-                conn.execute(text("""
-                    UPDATE system_variables 
-                    SET var_value = :value, var_type = :type, description = :desc, updated_at = CURRENT_TIMESTAMP
-                    WHERE var_name = :name
-                """), {
-                    'value': var_value,
-                    'type': var_type,
-                    'desc': description,
-                    'name': var_name
-                })
-            else:
-                conn.execute(text("""
-                    INSERT INTO system_variables (var_name, var_value, var_type, description, updated_at)
-                    VALUES (:name, :value, :type, :desc, CURRENT_TIMESTAMP)
-                """), {
-                    'name': var_name,
-                    'value': var_value,
-                    'type': var_type,
-                    'desc': description
-                })
-            
-            conn.commit()
-            return True
-        except Exception as e:
-            conn.rollback()
-            raise e
-        finally:
-            conn.close()
-    
-    def delete_system_var(self, var_name):
-        """حذف متغير نظام"""
-        conn = self.get_connection()
-        
-        try:
-            conn.execute(
-                text("DELETE FROM system_variables WHERE var_name = :name"),
-                {'name': var_name}
-            )
-            conn.commit()
-            return True
-        except Exception as e:
-            conn.rollback()
-            raise e
-        finally:
-            conn.close()
-    
-    def create_backup(self):
-        """إنشاء نسخة احتياطية"""
         return True
     
-    def get_dashboard_stats(self):
-        """إحصائيات لوحة التحكم"""
+    # ==================== الإشعارات - جديد! ====================
+    
+    def create_notification(self, user_id: int, request_id: int, message: str) -> int:
+        """إنشاء إشعار جديد"""
         conn = self.get_connection()
-        try:
-            users = conn.execute(text("SELECT COUNT(*) FROM users WHERE is_active = TRUE")).fetchone()
-            branches = conn.execute(text("SELECT COUNT(*) FROM branches WHERE is_active = TRUE")).fetchone()
-            requests = conn.execute(text("SELECT COUNT(*) FROM requests")).fetchone()
-            pending = conn.execute(text("SELECT COUNT(*) FROM requests WHERE status = 'pending'")).fetchone()
-            return {
-                'total_users': users[0] if users else 0,
-                'total_branches': branches[0] if branches else 0,
-                'total_requests': requests[0] if requests else 0,
-                'pending_requests': pending[0] if pending else 0
-            }
-        finally:
-            conn.close()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            INSERT INTO notifications (user_id, request_id, message)
+            VALUES (?, ?, ?)
+        """, (user_id, request_id, message))
+        
+        notif_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        return notif_id
     
-    def get_all_roles(self):
-        """الحصول على كل الأدوار"""
-        return [
-            {'role_name': 'compliance_officer', 'role_name_ar': 'مسؤول الامتثال'},
-            {'role_name': 'general_manager', 'role_name_ar': 'مدير عام'},
-            {'role_name': 'department_head', 'role_name_ar': 'رئيس قسم'},
-            {'role_name': 'employee', 'role_name_ar': 'موظف'}
-        ]
+    def get_unread_notifications(self, user_id: int) -> List[Dict]:
+        """الحصول على الإشعارات غير المقروءة"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT n.*, sr.title as request_title
+            FROM notifications n
+            JOIN service_requests sr ON n.request_id = sr.id
+            WHERE n.user_id = ? AND n.is_read = 0
+            ORDER BY n.created_at DESC
+            LIMIT 10
+        """, (user_id,))
+        
+        notifs = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        
+        return notifs
     
-    def get_all_departments(self):
-        """الحصول على كل الأقسام"""
-        return [
-            {'dept_name': 'Compliance', 'dept_name_ar': 'الامتثال'},
-            {'dept_name': 'Management', 'dept_name_ar': 'الإدارة'},
-            {'dept_name': 'IT', 'dept_name_ar': 'تقنية المعلومات'},
-            {'dept_name': 'Finance', 'dept_name_ar': 'المالية'},
-            {'dept_name': 'HR', 'dept_name_ar': 'الموارد البشرية'},
-            {'dept_name': 'Operations', 'dept_name_ar': 'العمليات'}
-        ]
+    def mark_notification_read(self, notif_id: int) -> bool:
+        """وضع علامة مقروء على الإشعار"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("UPDATE notifications SET is_read = 1 WHERE id = ?", (notif_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        return True
     
-    def get_unread_count(self, user_id):
+    def get_unread_count(self, user_id: int) -> int:
         """عدد الإشعارات غير المقروءة"""
         conn = self.get_connection()
-        try:
-            result = conn.execute(
-                text("SELECT COUNT(*) FROM notifications WHERE user_id = :id AND is_read = FALSE"),
-                {'id': user_id}
-            ).fetchone()
-            return result[0] if result else 0
-        finally:
-            conn.close()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0", (user_id,))
+        count = cursor.fetchone()[0]
+        conn.close()
+        
+        return count
     
-    def get_unread_notifications(self, user_id):
-        """الإشعارات غير المقروءة"""
+    # ==================== باقي الوظائف ====================
+    
+    def get_all_branches(self, include_inactive=False) -> List[Dict]:
+        """الحصول على جميع الفروع"""
         conn = self.get_connection()
-        try:
-            result = conn.execute(
-                text("""
-                    SELECT n.*, r.title as request_title
-                    FROM notifications n
-                    LEFT JOIN requests r ON n.request_id = r.id
-                    WHERE n.user_id = :id AND n.is_read = FALSE
-                    ORDER BY n.created_at DESC
-                """),
-                {'id': user_id}
-            ).fetchall()
-            return [self._row_to_dict(row) for row in result]
-        finally:
-            conn.close()
+        cursor = conn.cursor()
+        
+        if include_inactive:
+            cursor.execute("SELECT * FROM branches ORDER BY name")
+        else:
+            cursor.execute("SELECT * FROM branches WHERE is_active = 1 ORDER BY name")
+        
+        branches = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        
+        return branches
     
-    def mark_notification_read(self, notif_id):
-        """تعليم الإشعار كمقروء"""
+    def create_branch(self, data: Dict) -> int:
+        """إضافة فرع جديد"""
         conn = self.get_connection()
-        try:
-            conn.execute(
-                text("UPDATE notifications SET is_read = TRUE WHERE id = :id"),
-                {'id': notif_id}
-            )
-            conn.commit()
-        finally:
-            conn.close()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            INSERT INTO branches (name, code, location, manager_name, contact_phone, is_active)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            data['name'],
+            data['code'],
+            data.get('location', ''),
+            data.get('manager_name', ''),
+            data.get('contact_phone', ''),
+            data.get('is_active', 1)
+        ))
+        
+        branch_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        return branch_id
     
-    def get_all_statuses(self):
-        """الحصول على كل حالات الطلبات"""
-        return [
-            {'status_name': 'pending', 'status_name_ar': 'قيد الانتظار'},
-            {'status_name': 'in_progress', 'status_name_ar': 'قيد التنفيذ'},
-            {'status_name': 'completed', 'status_name_ar': 'مكتمل'},
-            {'status_name': 'rejected', 'status_name_ar': 'مرفوض'},
-            {'status_name': 'cancelled', 'status_name_ar': 'ملغى'}
-        ]
+    def update_branch(self, branch_id: int, data: Dict) -> bool:
+        """تحديث فرع"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE branches 
+            SET name = ?, code = ?, location = ?, manager_name = ?, contact_phone = ?, is_active = ?
+            WHERE id = ?
+        """, (
+            data['name'],
+            data['code'],
+            data.get('location', ''),
+            data.get('manager_name', ''),
+            data.get('contact_phone', ''),
+            data.get('is_active', 1),
+            branch_id
+        ))
+        
+        conn.commit()
+        conn.close()
+        
+        return True
     
-    def get_all_priorities(self):
-        """الحصول على كل مستويات الأولوية"""
-        return [
-            {'priority_name': 'low', 'priority_name_ar': 'منخفض'},
-            {'priority_name': 'medium', 'priority_name_ar': 'متوسط'},
-            {'priority_name': 'high', 'priority_name_ar': 'عالي'},
-            {'priority_name': 'urgent', 'priority_name_ar': 'عاجل'}
-        ]
+    def toggle_branch_status(self, branch_id: int) -> bool:
+        """تبديل حالة الفرع"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("UPDATE branches SET is_active = 1 - is_active WHERE id = ?", (branch_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        return True
     
-    def get_all_request_types(self):
-        """الحصول على كل أنواع الطلبات"""
-        return [
-            {'type_name': 'compliance_check', 'type_name_ar': 'فحص امتثال'},
-            {'type_name': 'branch_inspection', 'type_name_ar': 'تفتيش فرع'},
-            {'type_name': 'document_review', 'type_name_ar': 'مراجعة وثائق'},
-            {'type_name': 'audit', 'type_name_ar': 'تدقيق'},
-            {'type_name': 'training', 'type_name_ar': 'تدريب'},
-            {'type_name': 'other', 'type_name_ar': 'أخرى'}
-        ]
+    def get_all_users(self, include_inactive=False) -> List[Dict]:
+        """الحصول على جميع المستخدمين"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        if include_inactive:
+            cursor.execute("""
+                SELECT u.*, b.name as branch_name 
+                FROM users u
+                LEFT JOIN branches b ON u.branch_id = b.id
+                ORDER BY u.full_name
+            """)
+        else:
+            cursor.execute("""
+                SELECT u.*, b.name as branch_name 
+                FROM users u
+                LEFT JOIN branches b ON u.branch_id = b.id
+                WHERE u.is_active = 1
+                ORDER BY u.full_name
+            """)
+        
+        users = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        
+        return users
+    
+    def create_user(self, data: Dict) -> int:
+        """إضافة مستخدم جديد"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        hashed_password = self.hash_password(data['password'])
+        
+        cursor.execute("""
+            INSERT INTO users (username, password, full_name, email, role, department, branch_id, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            data['username'],
+            hashed_password,
+            data['full_name'],
+            data.get('email', ''),
+            data['role'],
+            data['department'],
+            data.get('branch_id'),
+            data.get('is_active', 1)
+        ))
+        
+        user_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        return user_id
+    
+    def update_user(self, user_id: int, data: Dict) -> bool:
+        """تحديث مستخدم"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        if 'password' in data and data['password']:
+            hashed_password = self.hash_password(data['password'])
+            cursor.execute("""
+                UPDATE users 
+                SET full_name = ?, email = ?, role = ?, department = ?, branch_id = ?, is_active = ?, password = ?
+                WHERE id = ?
+            """, (
+                data['full_name'],
+                data.get('email', ''),
+                data['role'],
+                data['department'],
+                data.get('branch_id'),
+                data.get('is_active', 1),
+                hashed_password,
+                user_id
+            ))
+        else:
+            cursor.execute("""
+                UPDATE users 
+                SET full_name = ?, email = ?, role = ?, department = ?, branch_id = ?, is_active = ?
+                WHERE id = ?
+            """, (
+                data['full_name'],
+                data.get('email', ''),
+                data['role'],
+                data['department'],
+                data.get('branch_id'),
+                data.get('is_active', 1),
+                user_id
+            ))
+        
+        conn.commit()
+        conn.close()
+        
+        return True
+    
+    def toggle_user_status(self, user_id: int) -> bool:
+        """تبديل حالة المستخدم"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("UPDATE users SET is_active = 1 - is_active WHERE id = ?", (user_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        return True
+    
+    def delete_user(self, user_id: int) -> bool:
+        """حذف مستخدم نهائياً"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        # حذف صلاحيات المستخدم أولاً
+        cursor.execute("DELETE FROM user_permissions WHERE user_id = ?", (user_id,))
+        
+        # حذف إشعارات المستخدم
+        cursor.execute("DELETE FROM notifications WHERE user_id = ?", (user_id,))
+        
+        # حذف المستخدم
+        cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        return True
+    
+    def get_requests_by_user(self, user_id: int) -> List[Dict]:
+        """الحصول على طلبات المستخدم"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT sr.*, u.full_name as creator_name, b.name as branch_name
+            FROM service_requests sr
+            JOIN users u ON sr.created_by = u.id
+            LEFT JOIN branches b ON sr.branch_id = b.id
+            WHERE sr.created_by = ?
+            ORDER BY sr.created_at DESC
+        """, (user_id,))
+        
+        requests = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        
+        return requests
+    
+    def get_all_requests(self) -> List[Dict]:
+        """الحصول على جميع الطلبات"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT sr.*, u.full_name as creator_name, b.name as branch_name
+            FROM service_requests sr
+            JOIN users u ON sr.created_by = u.id
+            LEFT JOIN branches b ON sr.branch_id = b.id
+            ORDER BY sr.created_at DESC
+        """)
+        
+        requests = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        
+        return requests
+    
+    def get_request_by_id(self, request_id: int) -> Optional[Dict]:
+        """الحصول على تفاصيل طلب"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT sr.*, u.full_name as creator_name, b.name as branch_name
+            FROM service_requests sr
+            JOIN users u ON sr.created_by = u.id
+            LEFT JOIN branches b ON sr.branch_id = b.id
+            WHERE sr.id = ?
+        """, (request_id,))
+        
+        request = cursor.fetchone()
+        conn.close()
+        
+        if request:
+            return dict(request)
+        return None
+    
+    def create_request(self, data: Dict) -> int:
+        """إنشاء طلب جديد"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            INSERT INTO service_requests 
+            (request_type, title, description, priority, created_by, department, branch_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            data['request_type'],
+            data['title'],
+            data.get('description', ''),
+            data.get('priority', 'medium'),
+            data['created_by'],
+            data.get('department', ''),
+            data.get('branch_id')
+        ))
+        
+        request_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        return request_id
+    
+    def update_request_status(self, request_id: int, status: str, notes: str = '') -> bool:
+        """تحديث حالة طلب"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            UPDATE service_requests 
+            SET status = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (status, notes, request_id))
+        
+        conn.commit()
+        conn.close()
+        
+        return True
+    
+    def get_all_roles(self) -> List[Dict]:
+        """الحصول على جميع الأدوار"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM system_roles WHERE is_active = 1 ORDER BY role_name_ar")
+        roles = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        
+        return roles
+    
+    def get_all_departments(self) -> List[Dict]:
+        """الحصول على جميع الأقسام"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM system_departments WHERE is_active = 1 ORDER BY dept_name_ar")
+        departments = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        
+        return departments
+    
+    def get_all_statuses(self) -> List[Dict]:
+        """الحصول على جميع الحالات"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM system_statuses WHERE is_active = 1 ORDER BY id")
+        statuses = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        
+        return statuses
+    
+    def add_role(self, role_name: str, role_name_ar: str, description: str = '') -> int:
+        """إضافة دور جديد"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            INSERT INTO system_roles (role_name, role_name_ar, description)
+            VALUES (?, ?, ?)
+        """, (role_name, role_name_ar, description))
+        
+        role_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        return role_id
+    
+    def add_department(self, dept_name: str, dept_name_ar: str, description: str = '') -> int:
+        """إضافة قسم جديد"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            INSERT INTO system_departments (dept_name, dept_name_ar, description)
+            VALUES (?, ?, ?)
+        """, (dept_name, dept_name_ar, description))
+        
+        dept_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        return dept_id
+    
+    def get_dashboard_stats(self, user_id: int = None) -> Dict:
+        """إحصائيات Dashboard"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        stats = {}
+        
+        if user_id:
+            cursor.execute("SELECT COUNT(*) FROM service_requests WHERE created_by = ?", (user_id,))
+            stats['total_requests'] = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM service_requests WHERE created_by = ? AND status = 'pending'", (user_id,))
+            stats['pending_requests'] = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM service_requests WHERE created_by = ? AND status = 'in_progress'", (user_id,))
+            stats['in_progress_requests'] = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM service_requests WHERE created_by = ? AND status = 'completed'", (user_id,))
+            stats['completed_requests'] = cursor.fetchone()[0]
+        else:
+            cursor.execute("SELECT COUNT(*) FROM service_requests")
+            stats['total_requests'] = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM service_requests WHERE status = 'pending'")
+            stats['pending_requests'] = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM service_requests WHERE status = 'in_progress'")
+            stats['in_progress_requests'] = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM service_requests WHERE status = 'completed'")
+            stats['completed_requests'] = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM branches WHERE is_active = 1")
+            stats['total_branches'] = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM users WHERE is_active = 1")
+            stats['total_users'] = cursor.fetchone()[0]
+        
+        conn.close()
+        return stats
