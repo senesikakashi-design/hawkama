@@ -11,20 +11,24 @@ class Database:
     """إدارة قاعدة البيانات"""
     
     def __init__(self):
-        # الاتصال بـ Supabase PostgreSQL
         database_url = os.environ.get('DATABASE_URL')
         if not database_url:
-            raise Exception("DATABASE_URL not found in environment variables!")
+            raise Exception("DATABASE_URL not found!")
         
         self.engine = create_engine(database_url, poolclass=NullPool)
         self.init_database()
     
     def get_connection(self):
-        """إنشاء اتصال جديد"""
         return self.engine.connect()
     
+    def _row_to_dict(self, row):
+        """تحويل Row إلى dict"""
+        if row is None:
+            return None
+        return dict(zip(row.keys(), row))
+    
     def init_database(self):
-        """إنشاء الجداول والبيانات الأساسية"""
+        """إنشاء الجداول"""
         conn = self.get_connection()
         
         try:
@@ -72,10 +76,7 @@ class Database:
                     assigned_to INTEGER,
                     branch_id INTEGER,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (created_by) REFERENCES users(id),
-                    FOREIGN KEY (assigned_to) REFERENCES users(id),
-                    FOREIGN KEY (branch_id) REFERENCES branches(id)
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """))
             
@@ -86,9 +87,7 @@ class Database:
                     request_id INTEGER NOT NULL,
                     user_id INTEGER NOT NULL,
                     comment TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (request_id) REFERENCES requests(id),
-                    FOREIGN KEY (user_id) REFERENCES users(id)
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """))
             
@@ -101,8 +100,7 @@ class Database:
                     can_manage_branches BOOLEAN DEFAULT FALSE,
                     can_view_requests BOOLEAN DEFAULT FALSE,
                     can_view_reports BOOLEAN DEFAULT FALSE,
-                    can_manage_system_vars BOOLEAN DEFAULT FALSE,
-                    FOREIGN KEY (user_id) REFERENCES users(id)
+                    can_manage_system_vars BOOLEAN DEFAULT FALSE
                 )
             """))
             
@@ -114,31 +112,25 @@ class Database:
                     request_id INTEGER,
                     message TEXT NOT NULL,
                     is_read BOOLEAN DEFAULT FALSE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users(id),
-                    FOREIGN KEY (request_id) REFERENCES requests(id)
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """))
             
             conn.commit()
-            
-            # إضافة البيانات الأساسية
             self.create_default_data(conn)
             
         except Exception as e:
             conn.rollback()
-            print(f"Error initializing database: {e}")
+            print(f"Error: {e}")
         finally:
             conn.close()
     
     def create_default_data(self, conn):
-        """إنشاء البيانات الأساسية"""
+        """البيانات الأساسية"""
         
-        # التحقق من وجود مستخدمين
         result = conn.execute(text("SELECT COUNT(*) as count FROM users")).fetchone()
         
         if result[0] == 0:
-            # إضافة المستخدمين الافتراضيين
             default_users = [
                 ('compliance', 'compliance123', 'مسؤول الامتثال', 'compliance@hawkama.iq', 'compliance_officer', 'Compliance'),
                 ('gm', 'gm123', 'المدير العام', 'gm@hawkama.iq', 'general_manager', 'Management'),
@@ -161,16 +153,17 @@ class Database:
             
             conn.commit()
         
-        # التحقق من وجود فروع
         result = conn.execute(text("SELECT COUNT(*) as count FROM branches")).fetchone()
         
         if result[0] == 0:
-            # إضافة الفروع الافتراضية
             branches = [
                 ('HQ-001', 'المقر الرئيسي - HQ', 'بغداد - المنصور', '07700000001', 'إدارة المقر'),
-                ('SVD-001', 'فرع السيدونية', 'بغداد - السيعودن', '07700000002', 'مدير السيعودن'),
+                ('SVD-001', 'فرع السيعودن', 'بغداد - السيعودن', '07700000002', 'مدير السيعودن'),
                 ('HAR-001', 'فرع الحارثية', 'بغداد - الحارثية', '07700000003', 'مدير الحارثية'),
-                # ... باقي الفروع
+                ('DRA-001', 'فرع الدورة', 'بغداد - الدورة', '07700000006', 'مدير الدورة'),
+                ('BSR-001', 'فرع البصرة', 'البصرة - العشار', '07700000009', 'مدير البصرة'),
+                ('ERB-001', 'فرع أربيل', 'أربيل', '07700000011', 'مدير أربيل'),
+                ('SLM-001', 'فرع السليمانية', 'السليمانية', '07700000016', 'مدير السليمانية')
             ]
             
             for code, name, city, phone, manager in branches:
@@ -188,51 +181,39 @@ class Database:
             conn.commit()
     
     def get_user_by_username(self, username):
-        """الحصول على مستخدم"""
         conn = self.get_connection()
         result = conn.execute(
             text("SELECT * FROM users WHERE username = :username"),
             {'username': username}
         ).fetchone()
         conn.close()
-        
-        if result:
-            return dict(result._mapping)
-        return None
+        return self._row_to_dict(result)
     
     def get_user_by_id(self, user_id):
-        """الحصول على مستخدم بالمعرف"""
         conn = self.get_connection()
         result = conn.execute(
             text("SELECT * FROM users WHERE id = :id"),
             {'id': user_id}
         ).fetchone()
         conn.close()
-        
-        if result:
-            return dict(result._mapping)
-        return None
+        return self._row_to_dict(result)
     
     def verify_password(self, plain_password, hashed_password):
-        """التحقق من كلمة المرور"""
         return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
     
     def get_all_branches(self, include_inactive=False):
-        """الحصول على كل الفروع"""
         conn = self.get_connection()
         
         if include_inactive:
             query = "SELECT * FROM branches ORDER BY name"
-            result = conn.execute(text(query)).fetchall()
         else:
             query = "SELECT * FROM branches WHERE is_active = TRUE ORDER BY name"
-            result = conn.execute(text(query)).fetchall()
         
+        result = conn.execute(text(query)).fetchall()
         conn.close()
-        return [dict(row._mapping) for row in result]
+        return [self._row_to_dict(row) for row in result]
     
     def toggle_branch_status(self, branch_id):
-        """تبديل حالة الفرع"""
         conn = self.get_connection()
         conn.execute(
             text("UPDATE branches SET is_active = NOT is_active WHERE id = :id"),
@@ -243,7 +224,6 @@ class Database:
         return True
     
     def get_all_users(self, include_inactive=False):
-        """الحصول على كل المستخدمين"""
         conn = self.get_connection()
         
         query = """
@@ -259,11 +239,9 @@ class Database:
         
         result = conn.execute(text(query)).fetchall()
         conn.close()
-        
-        return [dict(row._mapping) for row in result]
+        return [self._row_to_dict(row) for row in result]
     
     def toggle_user_status(self, user_id):
-        """تبديل حالة المستخدم"""
         conn = self.get_connection()
         conn.execute(
             text("UPDATE users SET is_active = NOT is_active WHERE id = :id"),
@@ -274,19 +252,12 @@ class Database:
         return True
     
     def delete_user(self, user_id):
-        """حذف مستخدم نهائياً"""
         conn = self.get_connection()
         
         try:
-            # حذف صلاحيات المستخدم
             conn.execute(text("DELETE FROM user_permissions WHERE user_id = :id"), {'id': user_id})
-            
-            # حذف إشعارات المستخدم
             conn.execute(text("DELETE FROM notifications WHERE user_id = :id"), {'id': user_id})
-            
-            # حذف المستخدم
             conn.execute(text("DELETE FROM users WHERE id = :id"), {'id': user_id})
-            
             conn.commit()
             return True
         except Exception as e:
