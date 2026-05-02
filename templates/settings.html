@@ -110,7 +110,7 @@
         <!-- النسخ الاحتياطي -->
         {% if user.role == 'compliance_officer' %}
         <div class="row">
-            <div class="col-md-12">
+            <div class="col-md-12 mb-4">
                 <div class="card shadow-sm border-warning">
                     <div class="card-header bg-warning text-dark">
                         <h5 class="mb-0"><i class="fas fa-database ms-2"></i>النسخ الاحتياطي</h5>
@@ -121,18 +121,34 @@
                             <strong>مهم:</strong> احرص على تحميل نسخة احتياطية من قاعدة البيانات بشكل دوري للحفاظ على البيانات.
                         </div>
                         
-                        <a href="{{ url_for('download_backup') }}" class="btn btn-warning btn-lg">
-                            <i class="fas fa-download ms-2"></i>
-                            تحميل نسخة احتياطية
-                        </a>
-                        
-                        <p class="mt-3 text-muted">
-                            <small>
-                                <i class="fas fa-lightbulb ms-2"></i>
-                                سيتم تحميل ملف قاعدة البيانات (workflow_v4.db) مباشرة إلى جهازك.
-                                احفظه في مكان آمن!
-                            </small>
-                        </p>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="mb-3"><i class="fas fa-download ms-2"></i>تحميل نسخة احتياطية</h6>
+                                <a href="{{ url_for('download_backup') }}" class="btn btn-warning btn-lg w-100">
+                                    <i class="fas fa-download ms-2"></i>
+                                    تحميل Backup
+                                </a>
+                                <p class="mt-2 text-muted small">
+                                    سيتم تحميل ملف قاعدة البيانات (.db) مباشرة إلى جهازك
+                                </p>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <h6 class="mb-3"><i class="fas fa-upload ms-2"></i>استرجاع نسخة احتياطية</h6>
+                                <form action="{{ url_for('upload_backup') }}" method="POST" enctype="multipart/form-data">
+                                    <div class="mb-3">
+                                        <input type="file" name="backup_file" class="form-control" accept=".db" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-success btn-lg w-100">
+                                        <i class="fas fa-upload ms-2"></i>
+                                        استرجاع Backup
+                                    </button>
+                                </form>
+                                <p class="mt-2 text-muted small">
+                                    اختر ملف .db من جهازك لاسترجاع البيانات (سيتم تسجيل خروجك)
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
