@@ -47,62 +47,62 @@
                     <h5 class="mb-3">الصلاحيات:</h5>
                     
                     <form method="POST" id="permForm">
+                        <input type="hidden" name="can_manage_users" value="0">
+                        <input type="hidden" name="can_manage_branches" value="0">
+                        <input type="hidden" name="can_manage_system_vars" value="0">
+                        <input type="hidden" name="can_view_reports" value="0">
+                        <input type="hidden" name="can_view_requests" value="0">
+                        <input type="hidden" name="can_backup" value="0">
+                        
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="form-check mb-3">
-                                    <input class="form-check-input" type="checkbox" name="can_manage_users" id="perm1">
+                                    <input class="form-check-input" type="checkbox" name="can_manage_users" id="perm1" value="1">
                                     <label class="form-check-label" for="perm1">
                                         <i class="fas fa-users text-primary ms-2"></i>
                                         <strong>إدارة المستخدمين</strong>
-                                        <small class="text-muted d-block">إضافة، تعديل، حذف المستخدمين</small>
                                     </label>
                                 </div>
                                 
                                 <div class="form-check mb-3">
-                                    <input class="form-check-input" type="checkbox" name="can_manage_branches" id="perm2">
+                                    <input class="form-check-input" type="checkbox" name="can_manage_branches" id="perm2" value="1">
                                     <label class="form-check-label" for="perm2">
                                         <i class="fas fa-building text-success ms-2"></i>
                                         <strong>إدارة الفروع</strong>
-                                        <small class="text-muted d-block">إضافة، تعديل، حذف الفروع</small>
                                     </label>
                                 </div>
                                 
                                 <div class="form-check mb-3">
-                                    <input class="form-check-input" type="checkbox" name="can_manage_system_vars" id="perm3">
+                                    <input class="form-check-input" type="checkbox" name="can_manage_system_vars" id="perm3" value="1">
                                     <label class="form-check-label" for="perm3">
                                         <i class="fas fa-cogs text-warning ms-2"></i>
                                         <strong>متغيرات النظام</strong>
-                                        <small class="text-muted d-block">إدارة الأدوار والأقسام والحالات</small>
                                     </label>
                                 </div>
                             </div>
                             
                             <div class="col-md-6">
                                 <div class="form-check mb-3">
-                                    <input class="form-check-input" type="checkbox" name="can_view_reports" id="perm4">
+                                    <input class="form-check-input" type="checkbox" name="can_view_reports" id="perm4" value="1">
                                     <label class="form-check-label" for="perm4">
                                         <i class="fas fa-chart-bar text-info ms-2"></i>
                                         <strong>التقارير</strong>
-                                        <small class="text-muted d-block">عرض التقارير وتصدير Excel</small>
                                     </label>
                                 </div>
                                 
                                 <div class="form-check mb-3">
-                                    <input class="form-check-input" type="checkbox" name="can_view_requests" id="perm5">
+                                    <input class="form-check-input" type="checkbox" name="can_view_requests" id="perm5" value="1">
                                     <label class="form-check-label" for="perm5">
                                         <i class="fas fa-ticket-alt text-danger ms-2"></i>
                                         <strong>مشاهدة الطلبات</strong>
-                                        <small class="text-muted d-block">عرض جميع الطلبات</small>
                                     </label>
                                 </div>
                                 
-                                <!-- صلاحية الباك آب الجديدة! -->
                                 <div class="form-check mb-3">
-                                    <input class="form-check-input" type="checkbox" name="can_backup" id="perm6">
+                                    <input class="form-check-input" type="checkbox" name="can_backup" id="perm6" value="1">
                                     <label class="form-check-label" for="perm6">
                                         <i class="fas fa-database text-warning ms-2"></i>
                                         <strong>النسخ الاحتياطي</strong>
-                                        <small class="text-muted d-block">تحميل واسترجاع نسخ احتياطية</small>
                                     </label>
                                 </div>
                             </div>
@@ -129,7 +129,6 @@
                 return;
             }
             
-            // جلب الصلاحيات الحالية
             fetch('/permissions/get/' + userId)
                 .then(response => response.json())
                 .then(data => {
@@ -140,9 +139,7 @@
                     document.getElementById('perm5').checked = data.can_view_requests == 1;
                     document.getElementById('perm6').checked = data.can_backup == 1;
                     
-                    // تحديث action الفورم
                     document.getElementById('permForm').action = '/permissions/set/' + userId;
-                    
                     document.getElementById('permissionsForm').style.display = 'block';
                 });
         }
