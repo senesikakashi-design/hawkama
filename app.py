@@ -472,13 +472,14 @@ def set_user_permissions_api(user_id):
         flash('ليس لديك صلاحية', 'danger')
         return redirect(url_for('dashboard'))
     
+    # ✅ كل القيم تبدأ من 0 - ماعدا can_view_requests
     permissions = {
-        'can_manage_users': 1 if request.form.get('can_manage_users') else 0,
-        'can_manage_branches': 1 if request.form.get('can_manage_branches') else 0,
-        'can_manage_system_vars': 1 if request.form.get('can_manage_system_vars') else 0,
-        'can_view_reports': 1 if request.form.get('can_view_reports') else 0,
-        'can_view_requests': 1 if request.form.get('can_view_requests') else 0,
-        'can_backup': 1 if request.form.get('can_backup') else 0,
+        'can_manage_users': 1 if request.form.get('can_manage_users') == '1' else 0,
+        'can_manage_branches': 1 if request.form.get('can_manage_branches') == '1' else 0,
+        'can_manage_system_vars': 1 if request.form.get('can_manage_system_vars') == '1' else 0,
+        'can_view_reports': 1 if request.form.get('can_view_reports') == '1' else 0,
+        'can_view_requests': 1 if request.form.get('can_view_requests') == '1' else 0,
+        'can_backup': 1 if request.form.get('can_backup') == '1' else 0,
     }
     
     try:
@@ -564,8 +565,6 @@ def export_excel():
     except Exception as e:
         flash(f'خطأ في تصدير Excel: {str(e)}', 'danger')
         return redirect(url_for('reports'))
-
-# ==================== باك آب واسترجاع - معدل! صلاحية can_backup ====================
 
 @app.route('/backup/download')
 @login_required
