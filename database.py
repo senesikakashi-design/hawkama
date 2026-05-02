@@ -19,12 +19,14 @@ class Database:
                 "workflow_v4.db"
             )
         
+        # تأكد المجلد موجود
         db_dir = os.path.dirname(db_path)
         if db_dir:
             os.makedirs(db_dir, exist_ok=True)
         
         self.db_path = db_path
         self.init_database()
+        self._migrate_database()  # ← تحقق من الأعمدة الجديدة
     
     def get_connection(self):
         """إنشاء اتصال بقاعدة البيانات"""
@@ -156,6 +158,7 @@ class Database:
         
         conn.commit()
         
+        # إضافة بيانات افتراضية
         self._create_default_branches(conn)
         self._create_default_users(conn)
         self._create_default_roles(conn)
@@ -164,7 +167,24 @@ class Database:
         
         conn.close()
     
+    def _migrate_database(self):
+        """إضافة أعمدة جديدة إذا ما موجودة"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        # التحقق من وجود عمود can_backup
+        cursor.execute("PRAGMA table_info(user_permissions)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        if 'can_backup' not in columns:
+            cursor.execute("ALTER TABLE user_permissions ADD COLUMN can_backup INTEGER DEFAULT 0")
+            conn.commit()
+            print("✅ Added can_backup column")
+        
+        conn.close()
+    
     def _create_default_branches(self, conn):
+        """إنشاء الفروع الـ 18"""
         cursor = conn.cursor()
         
         branches = [
@@ -200,6 +220,7 @@ class Database:
         conn.commit()
     
     def _create_default_users(self, conn):
+        """إنشاء مستخدمين افتراضيين"""
         cursor = conn.cursor()
         
         default_users = [
@@ -220,6 +241,7 @@ class Database:
         conn.commit()
     
     def _create_default_roles(self, conn):
+        """إنشاء الأدوار الافتراضية"""
         cursor = conn.cursor()
         
         roles = [
@@ -241,6 +263,7 @@ class Database:
         conn.commit()
     
     def _create_default_departments(self, conn):
+        """إنشاء الأقسام الافتراضية"""
         cursor = conn.cursor()
         
         departments = [
@@ -265,6 +288,7 @@ class Database:
         conn.commit()
     
     def _create_default_statuses(self, conn):
+        """إنشاء حالات الطلبات"""
         cursor = conn.cursor()
         
         statuses = [
@@ -288,9 +312,11 @@ class Database:
     
     @staticmethod
     def hash_password(password: str) -> str:
+        """تشفير كلمة المرور"""
         return hashlib.sha256(password.encode()).hexdigest()
     
     def verify_login(self, username: str, password: str) -> Optional[Dict]:
+        """التحقق من تسجيل الدخول"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -309,6 +335,7 @@ class Database:
         return None
     
     def get_user_by_id(self, user_id: int) -> Optional[Dict]:
+        """الحصول على مستخدم بالمعرف"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -321,6 +348,7 @@ class Database:
         return None
     
     def get_user_permissions(self, user_id: int) -> Dict:
+        """الحصول على صلاحيات المستخدم"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -342,6 +370,7 @@ class Database:
             }
     
     def set_user_permissions(self, user_id: int, permissions: Dict) -> bool:
+        """تعيين صلاحيات المستخدم"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -365,6 +394,7 @@ class Database:
         return True
     
     def create_notification(self, user_id: int, request_id: int, message: str) -> int:
+        """إنشاء إشعار جديد"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -380,6 +410,7 @@ class Database:
         return notif_id
     
     def get_unread_notifications(self, user_id: int) -> List[Dict]:
+        """الحصول على الإشعارات غير المقروءة"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -398,6 +429,7 @@ class Database:
         return notifs
     
     def mark_notification_read(self, notif_id: int) -> bool:
+        """وضع علامة مقروء على الإشعار"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -409,6 +441,7 @@ class Database:
         return True
     
     def get_unread_count(self, user_id: int) -> int:
+        """عدد الإشعارات غير المقروءة"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -419,6 +452,7 @@ class Database:
         return count
     
     def get_all_branches(self, include_inactive=False) -> List[Dict]:
+        """الحصول على جميع الفروع"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -433,6 +467,7 @@ class Database:
         return branches
     
     def create_branch(self, data: Dict) -> int:
+        """إضافة فرع جديد"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -455,6 +490,7 @@ class Database:
         return branch_id
     
     def update_branch(self, branch_id: int, data: Dict) -> bool:
+        """تحديث فرع"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -478,6 +514,7 @@ class Database:
         return True
     
     def toggle_branch_status(self, branch_id: int) -> bool:
+        """تبديل حالة الفرع"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -489,6 +526,7 @@ class Database:
         return True
     
     def get_all_users(self, include_inactive=False) -> List[Dict]:
+        """الحصول على جميع المستخدمين"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -514,6 +552,7 @@ class Database:
         return users
     
     def create_user(self, data: Dict) -> int:
+        """إضافة مستخدم جديد"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -540,6 +579,7 @@ class Database:
         return user_id
     
     def update_user(self, user_id: int, data: Dict) -> bool:
+        """تحديث مستخدم"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -580,6 +620,7 @@ class Database:
         return True
     
     def toggle_user_status(self, user_id: int) -> bool:
+        """تبديل حالة المستخدم"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -591,6 +632,7 @@ class Database:
         return True
     
     def delete_user(self, user_id: int) -> bool:
+        """حذف مستخدم نهائياً"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -604,6 +646,7 @@ class Database:
         return True
     
     def get_requests_by_user(self, user_id: int) -> List[Dict]:
+        """الحصول على طلبات المستخدم"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -622,6 +665,7 @@ class Database:
         return requests
     
     def get_all_requests(self) -> List[Dict]:
+        """الحصول على جميع الطلبات"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -639,6 +683,7 @@ class Database:
         return requests
     
     def get_request_by_id(self, request_id: int) -> Optional[Dict]:
+        """الحصول على تفاصيل طلب"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -658,6 +703,7 @@ class Database:
         return None
     
     def create_request(self, data: Dict) -> int:
+        """إنشاء طلب جديد"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -682,6 +728,7 @@ class Database:
         return request_id
     
     def update_request_status(self, request_id: int, status: str, notes: str = '') -> bool:
+        """تحديث حالة طلب"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -697,6 +744,7 @@ class Database:
         return True
     
     def get_all_roles(self) -> List[Dict]:
+        """الحصول على جميع الأدوار"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -707,6 +755,7 @@ class Database:
         return roles
     
     def get_all_departments(self) -> List[Dict]:
+        """الحصول على جميع الأقسام"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -717,6 +766,7 @@ class Database:
         return departments
     
     def get_all_statuses(self) -> List[Dict]:
+        """الحصول على جميع الحالات"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -727,6 +777,7 @@ class Database:
         return statuses
     
     def add_role(self, role_name: str, role_name_ar: str, description: str = '') -> int:
+        """إضافة دور جديد"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -742,6 +793,7 @@ class Database:
         return role_id
     
     def add_department(self, dept_name: str, dept_name_ar: str, description: str = '') -> int:
+        """إضافة قسم جديد"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -757,6 +809,7 @@ class Database:
         return dept_id
     
     def get_dashboard_stats(self, user_id: int = None) -> Dict:
+        """إحصائيات Dashboard"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -797,6 +850,7 @@ class Database:
         return stats
     
     def backup_database(self, backup_dir: str = None) -> str:
+        """إنشاء نسخة احتياطية"""
         if backup_dir is None:
             backup_dir = 'backups'
         
@@ -809,6 +863,7 @@ class Database:
         return backup_path
     
     def restore_database(self, backup_path: str) -> bool:
+        """استرجاع قاعدة البيانات من نسخة احتياطية"""
         try:
             if not os.path.exists(backup_path):
                 return False
