@@ -100,6 +100,10 @@
                             <li class="list-group-item"><i class="fas fa-check text-success ms-2"></i>مشاهدة الطلبات</li>
                             {% endif %}
                             
+                            {% if user.role == 'compliance_officer' or user.permissions.can_backup %}
+                            <li class="list-group-item"><i class="fas fa-check text-success ms-2"></i>النسخ الاحتياطي</li>
+                            {% endif %}
+                            
                             <li class="list-group-item"><i class="fas fa-check text-success ms-2"></i>إنشاء طلب جديد</li>
                         </ul>
                     </div>
@@ -107,8 +111,8 @@
             </div>
         </div>
         
-        <!-- النسخ الاحتياطي -->
-        {% if user.role == 'compliance_officer' %}
+        <!-- النسخ الاحتياطي - معدل! صلاحية can_backup -->
+        {% if user.role == 'compliance_officer' or user.permissions.can_backup %}
         <div class="row">
             <div class="col-md-12 mb-4">
                 <div class="card shadow-sm border-warning">
