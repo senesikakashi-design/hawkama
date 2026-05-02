@@ -5,6 +5,7 @@ Database Management Module - v4.0 with Permissions & Notifications
 import sqlite3
 import hashlib
 import os
+import shutil
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -13,14 +14,15 @@ class Database:
     
     def __init__(self, db_path: str = None):
         if db_path is None:
-            # Railway Volume (دائم) أو Local
             db_path = os.environ.get(
                 "DATABASE_PATH", 
-                "/app/data/workflow_v4.db"  # Railway Volume path
+                "workflow_v4.db"
             )
         
         # تأكد المجلد موجود
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        db_dir = os.path.dirname(db_path)
+        if db_dir:
+            os.makedirs(db_dir, exist_ok=True)
         
         self.db_path = db_path
         self.init_database()
@@ -124,7 +126,7 @@ class Database:
             )
         """)
         
-        # جدول الصلاحيات - جديد!
+        # جدول الصلاحيات
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS user_permissions (
                 user_id INTEGER PRIMARY KEY,
@@ -138,7 +140,7 @@ class Database:
             )
         """)
         
-        # جدول الإشعارات - جديد!
+        # جدول الإشعارات
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS notifications (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -327,8 +329,6 @@ class Database:
             return dict(user)
         return None
     
-    # ==================== الصلاحيات - جديد! ====================
-    
     def get_user_permissions(self, user_id: int) -> Dict:
         """الحصول على صلاحيات المستخدم"""
         conn = self.get_connection()
@@ -341,7 +341,6 @@ class Database:
         if perms:
             return dict(perms)
         else:
-            # صلاحيات افتراضية
             return {
                 'user_id': user_id,
                 'can_manage_users': 0,
@@ -373,8 +372,6 @@ class Database:
         conn.close()
         
         return True
-    
-    # ==================== الإشعارات - جديد! ====================
     
     def create_notification(self, user_id: int, request_id: int, message: str) -> int:
         """إنشاء إشعار جديد"""
@@ -433,8 +430,6 @@ class Database:
         conn.close()
         
         return count
-    
-    # ==================== باقي الوظائف ====================
     
     def get_all_branches(self, include_inactive=False) -> List[Dict]:
         """الحصول على جميع الفروع"""
@@ -621,13 +616,8 @@ class Database:
         conn = self.get_connection()
         cursor = conn.cursor()
         
-        # حذف صلاحيات المستخدم أولاً
         cursor.execute("DELETE FROM user_permissions WHERE user_id = ?", (user_id,))
-        
-        # حذف إشعارات المستخدم
         cursor.execute("DELETE FROM notifications WHERE user_id = ?", (user_id,))
-        
-        # حذف المستخدم
         cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
         
         conn.commit()
@@ -838,3 +828,30 @@ class Database:
         
         conn.close()
         return stats
+    
+    # ==================== باك آب واسترجاع ====================
+    
+    def backup_database(self, backup_dir: str = None) -> str:
+        """إنشاء نسخة احتياطية"""
+        if backup_dir is None:
+            backup_dir = 'backups'
+        
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = os.path.join(backup_dir, f"backup_{timestamp}.db")
+        
+        shutil.copy2(self.db_path, backup_path)
+        return backup_path
+    
+    def restore_database(self, backup_path: str) -> bool:
+        """استرجاع قاعدة البيانات من نسخة احتياطية"""
+        try:
+            if not os.path.exists(backup_path):
+                return False
+            
+            shutil.copy2(backup_path, self.db_path)
+            return True
+        except Exception as e:
+            print(f"Error restoring database: {e}")
+            return False
