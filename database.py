@@ -4,13 +4,24 @@ Database Management Module - v4.0 with Permissions & Notifications
 
 import sqlite3
 import hashlib
+import os
 from datetime import datetime
 from typing import Dict, List, Optional
 
 class Database:
     """إدارة قاعدة البيانات"""
     
-    def __init__(self, db_path: str = "workflow_v4.db"):
+    def __init__(self, db_path: str = None):
+        if db_path is None:
+            # Railway Volume (دائم) أو Local
+            db_path = os.environ.get(
+                "DATABASE_PATH", 
+                "/app/data/workflow_v4.db"  # Railway Volume path
+            )
+        
+        # تأكد المجلد موجود
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        
         self.db_path = db_path
         self.init_database()
     
