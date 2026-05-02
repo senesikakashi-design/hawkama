@@ -169,19 +169,22 @@ class Database:
     
     def _migrate_database(self):
         """إضافة أعمدة جديدة إذا ما موجودة"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        
-        # التحقق من وجود عمود can_backup
-        cursor.execute("PRAGMA table_info(user_permissions)")
-        columns = [column[1] for column in cursor.fetchall()]
-        
-        if 'can_backup' not in columns:
-            cursor.execute("ALTER TABLE user_permissions ADD COLUMN can_backup INTEGER DEFAULT 0")
-            conn.commit()
-            print("✅ Added can_backup column")
-        
-        conn.close()
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            # التحقق من وجود عمود can_backup
+            cursor.execute("PRAGMA table_info(user_permissions)")
+            columns = [column[1] for column in cursor.fetchall()]
+            
+            if 'can_backup' not in columns:
+                cursor.execute("ALTER TABLE user_permissions ADD COLUMN can_backup INTEGER DEFAULT 0")
+                conn.commit()
+                print("✅ Added can_backup column")
+            
+            conn.close()
+        except Exception as e:
+            print(f"Migration error: {e}")
     
     def _create_default_branches(self, conn):
         """إنشاء الفروع الـ 18"""
@@ -374,19 +377,37 @@ class Database:
         conn = self.get_connection()
         cursor = conn.cursor()
         
-        cursor.execute("""
-            INSERT OR REPLACE INTO user_permissions 
-            (user_id, can_manage_users, can_manage_branches, can_manage_system_vars, can_view_reports, can_view_requests, can_backup, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        """, (
-            user_id,
-            permissions.get('can_manage_users', 0),
-            permissions.get('can_manage_branches', 0),
-            permissions.get('can_manage_system_vars', 0),
-            permissions.get('can_view_reports', 0),
-            permissions.get('can_view_requests', 1),
-            permissions.get('can_backup', 0)
-        ))
+        # التحقق من وجود can_backup
+        cursor.execute("PRAGMA table_info(user_permissions)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        if 'can_backup' in columns:
+            cursor.execute("""
+                INSERT OR REPLACE INTO user_permissions 
+                (user_id, can_manage_users, can_manage_branches, can_manage_system_vars, can_view_reports, can_view_requests, can_backup, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (
+                user_id,
+                permissions.get('can_manage_users', 0),
+                permissions.get('can_manage_branches', 0),
+                permissions.get('can_manage_system_vars', 0),
+                permissions.get('can_view_reports', 0),
+                permissions.get('can_view_requests', 1),
+                permissions.get('can_backup', 0)
+            ))
+        else:
+            cursor.execute("""
+                INSERT OR REPLACE INTO user_permissions 
+                (user_id, can_manage_users, can_manage_branches, can_manage_system_vars, can_view_reports, can_view_requests, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (
+                user_id,
+                permissions.get('can_manage_users', 0),
+                permissions.get('can_manage_branches', 0),
+                permissions.get('can_manage_system_vars', 0),
+                permissions.get('can_view_reports', 0),
+                permissions.get('can_view_requests', 1)
+            ))
         
         conn.commit()
         conn.close()
