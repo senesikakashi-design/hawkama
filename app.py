@@ -478,6 +478,7 @@ def set_user_permissions_api(user_id):
         'can_manage_system_vars': 1 if request.form.get('can_manage_system_vars') else 0,
         'can_view_reports': 1 if request.form.get('can_view_reports') else 0,
         'can_view_requests': 1 if request.form.get('can_view_requests') else 0,
+        'can_backup': 1 if request.form.get('can_backup') else 0,
     }
     
     try:
@@ -564,16 +565,13 @@ def export_excel():
         flash(f'خطأ في تصدير Excel: {str(e)}', 'danger')
         return redirect(url_for('reports'))
 
-# ==================== باك آب واسترجاع - معدل! ====================
+# ==================== باك آب واسترجاع - معدل! صلاحية can_backup ====================
 
 @app.route('/backup/download')
 @login_required
+@permission_required('can_backup')
 def download_backup():
     """تحميل نسخة احتياطية من قاعدة البيانات"""
-    if current_user.role != 'compliance_officer':
-        flash('ليس لديك صلاحية', 'danger')
-        return redirect(url_for('dashboard'))
-    
     try:
         db_path = db.db_path
         
@@ -596,12 +594,9 @@ def download_backup():
 
 @app.route('/backup/upload', methods=['POST'])
 @login_required
+@permission_required('can_backup')
 def upload_backup():
     """رفع نسخة احتياطية واسترجاعها"""
-    if current_user.role != 'compliance_officer':
-        flash('ليس لديك صلاحية', 'danger')
-        return redirect(url_for('dashboard'))
-    
     try:
         if 'backup_file' not in request.files:
             flash('لم يتم اختيار ملف', 'danger')
@@ -617,11 +612,9 @@ def upload_backup():
             flash('الملف يجب أن يكون .db', 'danger')
             return redirect(url_for('settings'))
         
-        # حفظ الملف المرفوع
         upload_path = 'temp_backup.db'
         file.save(upload_path)
         
-        # استرجاع البيانات
         if db.restore_database(upload_path):
             os.remove(upload_path)
             flash('تم استرجاع البيانات بنجاح! الرجاء تسجيل الدخول من جديد', 'success')
