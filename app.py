@@ -30,7 +30,6 @@ class User(UserMixin):
         self.role = user_data['role']
         self.department = user_data['department']
         self.branch_id = user_data.get('branch_id')
-        # الصلاحيات
         self.permissions = db.get_user_permissions(user_data['id'])
 
 @login_manager.user_loader
@@ -41,18 +40,15 @@ def load_user(user_id):
     return None
 
 def permission_required(permission_name):
-    """التحقق من الصلاحية"""
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
             if not current_user.is_authenticated:
                 return redirect(url_for('login'))
             
-            # مسؤول الامتثال لديه كل الصلاحيات
             if current_user.role == 'compliance_officer':
                 return f(*args, **kwargs)
             
-            # التحقق من الصلاحية
             if not current_user.permissions.get(permission_name, 0):
                 flash('ليس لديك صلاحية للوصول لهذه الصفحة', 'danger')
                 return redirect(url_for('dashboard'))
@@ -103,7 +99,6 @@ def dashboard():
     else:
         stats = db.get_dashboard_stats(current_user.id)
     
-    # الطلبات حسب الصلاحيات
     if current_user.permissions.get('can_view_requests', 0) or current_user.role in ['compliance_officer', 'general_manager', 'department_head']:
         if current_user.role in ['compliance_officer', 'general_manager', 'department_head']:
             recent_requests = db.get_all_requests()[:5]
@@ -112,12 +107,9 @@ def dashboard():
     else:
         recent_requests = []
     
-    # عدد الإشعارات
     unread_count = db.get_unread_count(current_user.id)
     
     return render_template('dashboard.html', user=current_user, stats=stats, recent_requests=recent_requests, unread_count=unread_count)
-
-# ==================== إدارة الفروع ====================
 
 @app.route('/branches/manage')
 @login_required
@@ -179,8 +171,6 @@ def toggle_branch(branch_id):
         flash(f'خطأ: {str(e)}', 'danger')
     
     return redirect(url_for('manage_branches'))
-
-# ==================== إدارة المستخدمين ====================
 
 @app.route('/users/manage')
 @login_required
@@ -257,7 +247,6 @@ def toggle_user(user_id):
 @login_required
 @permission_required('can_manage_users')
 def delete_user(user_id):
-    # منع حذف نفسك
     if user_id == current_user.id:
         flash('لا يمكنك حذف حسابك الخاص!', 'danger')
         return redirect(url_for('manage_users'))
@@ -274,7 +263,6 @@ def delete_user(user_id):
 @login_required
 @permission_required('can_manage_users')
 def export_users_excel():
-    """تصدير المستخدمين إلى Excel"""
     try:
         import xlsxwriter
         
@@ -339,12 +327,9 @@ def export_users_excel():
         flash(f'خطأ في تصدير Excel: {str(e)}', 'danger')
         return redirect(url_for('manage_users'))
 
-# ==================== الطلبات ====================
-
 @app.route('/requests')
 @login_required
 def requests():
-    # التحقق من الصلاحية
     if not current_user.permissions.get('can_view_requests', 0) and current_user.role not in ['compliance_officer', 'general_manager', 'department_head']:
         flash('ليس لديك صلاحية لعرض الطلبات', 'danger')
         return redirect(url_for('dashboard'))
@@ -404,7 +389,6 @@ def new_request():
         
         request_id = db.create_request(data)
         
-        # إنشاء إشعارات للمسؤولين
         managers = db.get_all_users()
         for manager in managers:
             if manager['role'] in ['compliance_officer', 'general_manager', 'department_head']:
@@ -418,8 +402,6 @@ def new_request():
         return redirect(url_for('requests'))
     
     return render_template('new_request.html', user=current_user)
-
-# ==================== متغيرات النظام ====================
 
 @app.route('/system/variables')
 @login_required
@@ -462,8 +444,6 @@ def add_department():
         flash(f'خطأ: {str(e)}', 'danger')
     
     return redirect(url_for('system_variables'))
-
-# ==================== إدارة الصلاحيات - جديد! ====================
 
 @app.route('/permissions/manage')
 @login_required
@@ -508,12 +488,9 @@ def set_user_permissions_api(user_id):
     
     return redirect(url_for('manage_permissions'))
 
-# ==================== الإشعارات - جديد! ====================
-
 @app.route('/api/notifications/unread')
 @login_required
 def get_unread_notifications():
-    """API للحصول على الإشعارات غير المقروءة"""
     notifications = db.get_unread_notifications(current_user.id)
     count = db.get_unread_count(current_user.id)
     
@@ -525,11 +502,8 @@ def get_unread_notifications():
 @app.route('/api/notifications/mark_read/<int:notif_id>', methods=['POST'])
 @login_required
 def mark_notification_read_api(notif_id):
-    """وضع علامة مقروء"""
     db.mark_notification_read(notif_id)
     return jsonify({'success': True})
-
-# ==================== التقارير ====================
 
 @app.route('/reports')
 @login_required
@@ -590,7 +564,7 @@ def export_excel():
         flash(f'خطأ في تصدير Excel: {str(e)}', 'danger')
         return redirect(url_for('reports'))
 
-# ==================== الباك آب - معدل! ====================
+# ==================== باك آب واسترجاع - معدل! ====================
 
 @app.route('/backup/download')
 @login_required
@@ -601,7 +575,7 @@ def download_backup():
         return redirect(url_for('dashboard'))
     
     try:
-        db_path = db.db_path  # ← المسار الحقيقي من Database class
+        db_path = db.db_path
         
         if not os.path.exists(db_path):
             flash('قاعدة البيانات غير موجودة', 'danger')
@@ -620,12 +594,52 @@ def download_backup():
         flash(f'خطأ في تحميل النسخة الاحتياطية: {str(e)}', 'danger')
         return redirect(url_for('settings'))
 
+@app.route('/backup/upload', methods=['POST'])
+@login_required
+def upload_backup():
+    """رفع نسخة احتياطية واسترجاعها"""
+    if current_user.role != 'compliance_officer':
+        flash('ليس لديك صلاحية', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    try:
+        if 'backup_file' not in request.files:
+            flash('لم يتم اختيار ملف', 'danger')
+            return redirect(url_for('settings'))
+        
+        file = request.files['backup_file']
+        
+        if file.filename == '':
+            flash('لم يتم اختيار ملف', 'danger')
+            return redirect(url_for('settings'))
+        
+        if not file.filename.endswith('.db'):
+            flash('الملف يجب أن يكون .db', 'danger')
+            return redirect(url_for('settings'))
+        
+        # حفظ الملف المرفوع
+        upload_path = 'temp_backup.db'
+        file.save(upload_path)
+        
+        # استرجاع البيانات
+        if db.restore_database(upload_path):
+            os.remove(upload_path)
+            flash('تم استرجاع البيانات بنجاح! الرجاء تسجيل الدخول من جديد', 'success')
+            logout_user()
+        else:
+            flash('خطأ في استرجاع البيانات', 'danger')
+        
+        return redirect(url_for('login'))
+        
+    except Exception as e:
+        flash(f'خطأ: {str(e)}', 'danger')
+        return redirect(url_for('settings'))
+
 @app.route('/settings')
 @login_required
 def settings():
     return render_template('settings.html', user=current_user)
 
 if __name__ == '__main__':
-    import os
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port, debug=False)
