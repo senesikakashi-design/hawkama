@@ -472,7 +472,6 @@ def set_user_permissions_api(user_id):
         flash('ليس لديك صلاحية', 'danger')
         return redirect(url_for('dashboard'))
     
-    # ✅ كل القيم تبدأ من 0 - ماعدا can_view_requests
     permissions = {
         'can_manage_users': 1 if request.form.get('can_manage_users') == '1' else 0,
         'can_manage_branches': 1 if request.form.get('can_manage_branches') == '1' else 0,
@@ -488,7 +487,7 @@ def set_user_permissions_api(user_id):
     except Exception as e:
         flash(f'خطأ: {str(e)}', 'danger')
     
-    return redirect(url_for('manage_permissions'))
+    return redirect(url_for('manage_permissions') + '?user_id=' + str(user_id))
 
 @app.route('/api/notifications/unread')
 @login_required
