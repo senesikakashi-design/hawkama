@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>الطلبات</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<base target="_blank">
+</head>
+<body>
+    {% include 'sidebar.html' %}
+
+    <div class="main-content">
+        <div class="page-header">
+            <h1>🎫 الطلبات</h1>
+            <p>عرض وإدارة الطلبات</p>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                {% if requests %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>العنوان</th>
+                                <th>النوع</th>
+                                <th>الحالة</th>
+                                <th>الأولوية</th>
+                                <th>القسم</th>
+                                <th>التاريخ</th>
+                                <th>إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in requests %}
+                            <tr>
+                                <td>{{ req.id }}</td>
+                                <td>{{ req.title }}</td>
+                                <td><span class="badge badge-primary">{{ req.request_type }}</span></td>
+                                <td>
+                                    {% if req.status == 'pending' %}
+                                        <span class="badge" style="background: #ff9800">قيد المعالجة</span>
+                                    {% elif req.status == 'in_progress' %}
+                                        <span class="badge" style="background: #ffc107">قيد الإنجاز</span>
+                                    {% elif req.status == 'completed' %}
+                                        <span class="badge" style="background: #4caf50">منجز</span>
+                                    {% elif req.status == 'approved' %}
+                                        <span class="badge" style="background: #2196f3">موافق عليه</span>
+                                    {% else %}
+                                        <span class="badge" style="background: #f44336">مرفوض</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    {% if req.priority == 'urgent' %}
+                                        <span class="badge" style="background: #dc3545">عاجلة</span>
+                                    {% elif req.priority == 'high' %}
+                                        <span class="badge badge-danger">عالية</span>
+                                    {% elif req.priority == 'medium' %}
+                                        <span class="badge badge-warning">متوسطة</span>
+                                    {% else %}
+                                        <span class="badge badge-success">منخفضة</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ req.department }}</td>
+                                <td>{{ req.created_at[:10] }}</td>
+                                <td class="text-center">
+                                    <a href="{{ url_for('view_request', request_id=req.id) }}" class="btn btn-sm btn-info" title="عرض التفاصيل">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <!-- ✅✅✅ جديد: زر الحذف بـ form POST -->
+                                    <form action="{{ url_for('delete_request', request_id=req.id) }}" method="POST" style="display:inline;" onsubmit="return confirm('⚠️ هل أنت متأكد من حذف هذا الطلب نهائياً؟')">
+                                        <button type="submit" class="btn btn-sm btn-danger" title="حذف">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="fas fa-inbox fa-4x mb-3"></i>
+                    <p>لا توجد طلبات</p>
+                    <a href="{{ url_for('new_request') }}" class="btn btn-primary">
+                        <i class="fas fa-plus ms-2"></i>
+                        إنشاء طلب جديد
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

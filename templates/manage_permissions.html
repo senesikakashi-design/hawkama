@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إدارة الصلاحيات</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    {% include 'sidebar.html' %}
+
+    <div class="main-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="page-header">
+            <h1>🔐 إدارة الصلاحيات</h1>
+            <p>تحديد صلاحيات المستخدمين</p>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label"><strong>اختر المستخدم:</strong></label>
+                        <select class="form-select" id="userSelect" onchange="loadPermissions()">
+                            <option value="">-- اختر مستخدم --</option>
+                            {% for u in users %}
+                            <option value="{{ u.id }}" {% if request.args.get('user_id')|int == u.id %}selected{% endif %}>{{ u.full_name }} ({{ u.username }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div id="permissionsForm" style="display: none;">
+                    <hr>
+                    <h5 class="mb-3">الصلاحيات:</h5>
+
+                    <form method="POST" id="permForm" action="" onsubmit="savePermissions(event)">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" name="can_manage_users" id="perm1" value="1">
+                                    <label class="form-check-label" for="perm1">
+                                        <i class="fas fa-users text-primary ms-2"></i>
+                                        <strong>إدارة المستخدمين</strong>
+                                    </label>
+                                </div>
+
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" name="can_manage_branches" id="perm2" value="1">
+                                    <label class="form-check-label" for="perm2">
+                                        <i class="fas fa-building text-success ms-2"></i>
+                                        <strong>إدارة الفروع</strong>
+                                    </label>
+                                </div>
+
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" name="can_manage_system_vars" id="perm3" value="1">
+                                    <label class="form-check-label" for="perm3">
+                                        <i class="fas fa-cogs text-warning ms-2"></i>
+                                        <strong>متغيرات النظام</strong>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" name="can_view_reports" id="perm4" value="1">
+                                    <label class="form-check-label" for="perm4">
+                                        <i class="fas fa-chart-bar text-info ms-2"></i>
+                                        <strong>التقارير</strong>
+                                    </label>
+                                </div>
+
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" name="can_view_requests" id="perm5" value="1" checked>
+                                    <label class="form-check-label" for="perm5">
+                                        <i class="fas fa-ticket-alt text-danger ms-2"></i>
+                                        <strong>مشاهدة الطلبات</strong>
+                                    </label>
+                                </div>
+
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" name="can_backup" id="perm6" value="1">
+                                    <label class="form-check-label" for="perm6">
+                                        <i class="fas fa-database text-warning ms-2"></i>
+                                        <strong>النسخ الاحتياطي</strong>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+                        <button type="submit" class="btn btn-primary" id="saveBtn">
+                            <i class="fas fa-save ms-2"></i>
+                            حفظ الصلاحيات
+                        </button>
+                        <span id="saveStatus" class="ms-3" style="display: none;"></span>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const userId = urlParams.get('user_id');
+
+            if (userId) {
+                document.getElementById('userSelect').value = userId;
+                loadPermissions();
+            }
+        });
+
+        function loadPermissions() {
+            const userId = document.getElementById('userSelect').value;
+            const formDiv = document.getElementById('permissionsForm');
+
+            if (!userId) {
+                formDiv.style.display = 'none';
+                return;
+            }
+
+            document.getElementById('perm1').checked = false;
+            document.getElementById('perm2').checked = false;
+            document.getElementById('perm3').checked = false;
+            document.getElementById('perm4').checked = false;
+            document.getElementById('perm5').checked = true;
+            document.getElementById('perm6').checked = false;
+
+            document.getElementById('permForm').setAttribute('action', '/permissions/set/' + userId);
+
+            formDiv.style.display = 'block';
+
+            fetch('/permissions/get/' + userId)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Permissions received:', data);
+
+                    document.getElementById('perm1').checked = data.can_manage_users == 1;
+                    document.getElementById('perm2').checked = data.can_manage_branches == 1;
+                    document.getElementById('perm3').checked = data.can_manage_system_vars == 1;
+                    document.getElementById('perm4').checked = data.can_view_reports == 1;
+                    document.getElementById('perm5').checked = data.can_view_requests == 1;
+                    document.getElementById('perm6').checked = data.can_backup == 1;
+
+                    console.log('can_backup value:', data.can_backup, '-> checked:', document.getElementById('perm6').checked);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+
+        function savePermissions(event) {
+            event.preventDefault();
+
+            const userId = document.getElementById('userSelect').value;
+            const saveBtn = document.getElementById('saveBtn');
+            const saveStatus = document.getElementById('saveStatus');
+
+            const formData = new FormData();
+            formData.append('can_manage_users', document.getElementById('perm1').checked ? '1' : '0');
+            formData.append('can_manage_branches', document.getElementById('perm2').checked ? '1' : '0');
+            formData.append('can_manage_system_vars', document.getElementById('perm3').checked ? '1' : '0');
+            formData.append('can_view_reports', document.getElementById('perm4').checked ? '1' : '0');
+            formData.append('can_view_requests', document.getElementById('perm5').checked ? '1' : '0');
+            formData.append('can_backup', document.getElementById('perm6').checked ? '1' : '0');
+
+            console.log('Saving can_backup:', document.getElementById('perm6').checked ? '1' : '0');
+
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin ms-2"></i> جاري الحفظ...';
+
+            fetch('/permissions/set/' + userId, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-save ms-2"></i> حفظ الصلاحيات';
+
+                if (data.success) {
+                    saveStatus.innerHTML = '<span class="text-success"><i class="fas fa-check-circle"></i> ' + data.message + '</span>';
+                    saveStatus.style.display = 'inline';
+
+                    setTimeout(() => {
+                        saveStatus.style.display = 'none';
+                    }, 3000);
+                } else {
+                    saveStatus.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-circle"></i> ' + data.message + '</span>';
+                    saveStatus.style.display = 'inline';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-save ms-2"></i> حفظ الصلاحيات';
+                saveStatus.innerHTML = '<span class="text-danger"><i class="fas fa-exclamation-circle"></i> خطأ في الاتصال</span>';
+                saveStatus.style.display = 'inline';
+            });
+        }
+    </script>
+</body>
+</html>
