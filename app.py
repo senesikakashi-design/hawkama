@@ -11,6 +11,7 @@ import os
 import io
 import shutil
 import sqlite3
+import glob
 from datetime import datetime
 
 app = Flask(__name__)
@@ -126,7 +127,43 @@ def dashboard():
     else:
         recent_requests = []
     unread_count = db.get_unread_count(current_user.id)
-    return render_template('dashboard.html', user=current_user, stats=stats, recent_requests=recent_requests, unread_count=unread_count)
+    
+    # ✅ جديد: تاريخ آخر باك آب - يبحث بكل الأماكن
+    backup_files = []
+    
+    # البحث بالمجلد الرئيسي
+    backup_files.extend(glob.glob('workflow_backup_*.db'))
+    
+    # البحث بمجلد backups
+    backup_files.extend(glob.glob('backups/backup_*.db'))
+    
+    # البحث بـ Downloads
+    downloads_path = os.path.join(os.path.expanduser('~'), 'Downloads')
+    backup_files.extend(glob.glob(os.path.join(downloads_path, 'workflow_backup_*.db')))
+    
+    # البحث بـ Desktop
+    desktop_path = os.path.join(os.path.expanduser('~'), 'Desktop')
+    backup_files.extend(glob.glob(os.path.join(desktop_path, 'workflow_backup_*.db')))
+    
+    last_backup_date = ''
+    days_since_backup = 999
+    
+    if backup_files:
+        last_backup = max(backup_files, key=os.path.getctime)
+        backup_timestamp = os.path.getctime(last_backup)
+        last_backup_date = datetime.fromtimestamp(backup_timestamp).strftime('%Y-%m-%d %H:%M')
+        days_since_backup = (datetime.now() - datetime.fromtimestamp(backup_timestamp)).days
+        print(f"✅ Backup found: {last_backup} | Date: {last_backup_date} | Days: {days_since_backup}")
+    else:
+        print("❌ No backup files found anywhere")
+    
+    return render_template('dashboard.html', 
+        user=current_user, 
+        stats=stats, 
+        recent_requests=recent_requests, 
+        unread_count=unread_count, 
+        last_backup_date=last_backup_date, 
+        days_since_backup=days_since_backup)
 
 # ==================== الفروع ====================
 @app.route('/branches/manage')
@@ -185,7 +222,6 @@ def toggle_branch(branch_id):
         flash(f'خطأ: {str(e)}', 'danger')
     return redirect(url_for('manage_branches'))
 
-# ✅ جديد: حذف الفرع نهائياً
 @app.route('/branches/delete/<int:branch_id>')
 @login_required
 @permission_required('can_manage_branches')
@@ -345,7 +381,11 @@ def view_request(request_id):
         flash('الطلب غير موجود', 'danger')
         return redirect(url_for('requests'))
     statuses = db.get_all_statuses()
-    return render_template('view_request.html', user=current_user, request=req, statuses=statuses)
+    
+    # ✅ جديد: جلب تاريخ تحديثات الحالة
+    status_history = db.get_request_status_history(request_id)
+    
+    return render_template('view_request.html', user=current_user, request=req, statuses=statuses, status_history=status_history)
 
 @app.route('/requests/update_status/<int:request_id>', methods=['POST'])
 @login_required
@@ -353,10 +393,20 @@ def update_request_status(request_id):
     if current_user.role not in ['compliance_officer', 'general_manager', 'department_head']:
         flash('ليس لديك صلاحية', 'danger')
         return redirect(url_for('requests'))
+    
     status = request.form.get('status')
     notes = request.form.get('notes', '')
+    
+    # ✅ جديد: الحصول على الحالة القديمة قبل التحديث
+    req = db.get_request_by_id(request_id)
+    old_status = req['status'] if req else ''
+    
     try:
         db.update_request_status(request_id, status, notes)
+        
+        # ✅ جديد: حفظ تاريخ التحديث
+        db.create_status_history(request_id, old_status, status, current_user.id, notes)
+        
         flash('تم تحديث حالة الطلب بنجاح', 'success')
     except Exception as e:
         flash(f'خطأ: {str(e)}', 'danger')
@@ -370,7 +420,6 @@ def delete_request(request_id):
         flash('الطلب غير موجود', 'danger')
         return redirect(url_for('requests'))
     
-    # التحقق من الصلاحية: compliance_officer أو general_manager أو صاحب الطلب
     if current_user.role not in ['compliance_officer', 'general_manager'] and req['created_by'] != current_user.id:
         flash('ليس لديك صلاحية لحذف هذا الطلب', 'danger')
         return redirect(url_for('requests'))
@@ -393,7 +442,7 @@ def new_request():
             'description': request.form.get('description'),
             'priority': request.form.get('priority', 'medium'),
             'created_by': current_user.id,
-            'department': request.form.get('department'),  # ✅ تغيّر من current_user.department
+            'department': request.form.get('department'),
             'branch_id': current_user.branch_id
         }
 
@@ -412,7 +461,7 @@ def new_request():
         return redirect(url_for('requests'))
 
     request_types = db.get_all_request_types()
-    departments = db.get_all_departments()  # ✅ جديد
+    departments = db.get_all_departments()
     return render_template('new_request.html', user=current_user, request_types=request_types, departments=departments)
 
 # ==================== متغيرات النظام ====================
@@ -528,7 +577,6 @@ def delete_status(status_id):
         flash(f'خطأ: {str(e)}', 'danger')
     return redirect(url_for('system_variables'))
 
-# ✅ جديد: أنواع الطلبات
 @app.route('/system/add_request_type', methods=['POST'])
 @login_required
 @permission_required('can_manage_system_vars')
@@ -613,6 +661,13 @@ def mark_notification_read_api(notif_id):
     db.mark_notification_read(notif_id)
     return jsonify({'success': True})
 
+# ✅ جديد: API لجلب تاريخ تحديثات الحالة
+@app.route('/api/status_history/<int:request_id>')
+@login_required
+def get_status_history_api(request_id):
+    history = db.get_request_status_history(request_id)
+    return jsonify({'history': history})
+
 # ==================== التقارير ====================
 @app.route('/reports')
 @login_required
@@ -620,6 +675,17 @@ def mark_notification_read_api(notif_id):
 def reports():
     stats = db.get_dashboard_stats()
     all_requests = db.get_all_requests()
+    
+    # ✅ جديد: إضافة آخر تحديث حالة لكل طلب
+    for req in all_requests:
+        last_change = db.get_last_status_change(req['id'])
+        if last_change:
+            req['last_status_change'] = last_change['created_at']
+            req['last_status_updater'] = last_change.get('updater_name', 'غير معروف')
+        else:
+            req['last_status_change'] = None
+            req['last_status_updater'] = None
+    
     return render_template('reports.html', user=current_user, stats=stats, requests=all_requests)
 
 @app.route('/reports/export_excel')
