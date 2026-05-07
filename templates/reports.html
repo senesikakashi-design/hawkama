@@ -69,6 +69,7 @@
                                 <th>العنوان</th>
                                 <th>النوع</th>
                                 <th>الحالة</th>
+                                <th>تاريخ آخر تحديث</th>
                                 <th>الأولوية</th>
                                 <th>القسم</th>
                                 <th>الفرع</th>
@@ -95,6 +96,17 @@
                                         <span class="badge" style="background: #f44336">مرفوض</span>
                                     {% endif %}
                                 </td>
+                                <!-- ✅ زر يفتح Modal بتاريخ التحديثات -->
+                                <td class="text-center">
+                                    {% if req.last_status_change %}
+                                        <button class="btn btn-sm btn-outline-info" onclick="showStatusHistory({{ req.id }})" title="عرض تاريخ التحديثات">
+                                            <i class="fas fa-history"></i><br>
+                                            <small>{{ req.last_status_change[:10] }}</small>
+                                        </button>
+                                    {% else %}
+                                        <small class="text-muted">-</small>
+                                    {% endif %}
+                                </td>
                                 <td class="text-center">
                                     {% if req.priority == 'urgent' %}
                                         <span class="badge" style="background: #dc3545">عاجلة</span>
@@ -119,6 +131,79 @@
         </div>
     </div>
 
+    <!-- ✅ Modal عرض تاريخ التحديثات -->
+    <div class="modal fade" id="statusHistoryModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title"><i class="fas fa-history ms-2"></i>تاريخ تحديثات الحالة</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="statusHistoryContent">
+                    <div class="text-center">
+                        <i class="fas fa-spinner fa-spin fa-2x"></i>
+                        <p>جاري التحميل...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    function showStatusHistory(requestId) {
+        const modal = new bootstrap.Modal(document.getElementById('statusHistoryModal'));
+        modal.show();
+        
+        fetch('/api/status_history/' + requestId)
+            .then(response => response.json())
+            .then(data => {
+                let html = '<div class="table-responsive"><table class="table table-sm table-hover">';
+                html += '<thead><tr><th>التاريخ</th><th>من</th><th>إلى</th><th>بواسطة</th><th>ملاحظات</th></tr></thead><tbody>';
+                
+                if (data.history && data.history.length > 0) {
+                    data.history.forEach(item => {
+                        const oldStatus = getStatusBadge(item.old_status);
+                        const newStatus = getStatusBadge(item.new_status);
+                        html += `<tr>
+                            <td>${item.created_at.substring(0, 16)}</td>
+                            <td>${oldStatus}</td>
+                            <td>${newStatus}</td>
+                            <td>${item.updater_name || 'غير معروف'}</td>
+                            <td>${item.notes || '-'}</td>
+                        </tr>`;
+                    });
+                } else {
+                    html += '<tr><td colspan="5" class="text-center text-muted">لا توجد تحديثات سابقة</td></tr>';
+                }
+                
+                html += '</tbody></table></div>';
+                document.getElementById('statusHistoryContent').innerHTML = html;
+            })
+            .catch(error => {
+                document.getElementById('statusHistoryContent').innerHTML = '<div class="alert alert-danger">خطأ في تحميل البيانات</div>';
+            });
+    }
+
+    function getStatusBadge(status) {
+        const colors = {
+            'pending': '#ff9800',
+            'in_progress': '#ffc107',
+            'completed': '#4caf50',
+            'approved': '#2196f3',
+            'rejected': '#f44336'
+        };
+        const names = {
+            'pending': 'قيد المعالجة',
+            'in_progress': 'قيد الإنجاز',
+            'completed': 'منجز',
+            'approved': 'موافق عليه',
+            'rejected': 'مرفوض'
+        };
+        const color = colors[status] || '#9e9e9e';
+        const name = names[status] || status;
+        return `<span class="badge" style="background: ${color}">${name}</span>`;
+    }
+    </script>
 </body>
 </html>
