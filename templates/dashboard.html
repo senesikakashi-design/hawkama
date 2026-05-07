@@ -13,6 +13,39 @@
     {% include 'sidebar.html' %}
 
     <div class="main-content">
+        <!-- ✅ تنبيه الباك آب - يظهر فقط وقت الحاجة -->
+        {% if days_since_backup >= 7 %}
+            <!-- 🔴 مر أسبوع أو أكثر - تنبيه خطير -->
+            <div class="alert alert-danger alert-dismissible fade show">
+                <i class="fas fa-exclamation-triangle ms-2"></i>
+                <strong>⚠️ تنبيه أمان:</strong> آخر باك آب: {{ last_backup_date }} (منذ {{ days_since_backup }} يوم)
+                <br>⚠️ <strong>مر أكثر من أسبوع!</strong> 
+                <br><a href="{{ url_for('download_backup') }}" class="alert-link btn btn-danger btn-sm mt-2">
+                    <i class="fas fa-download"></i> نزل باك آب الآن
+                </a>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% elif days_since_backup >= 5 %}
+            <!-- 🟡 تبقى يومين - تنبيه مسبق -->
+            <div class="alert alert-warning alert-dismissible fade show">
+                <i class="fas fa-clock ms-2"></i>
+                <strong>تذكير:</strong> آخر باك آب: {{ last_backup_date }}
+                <br>تبقى {{ 7 - days_since_backup }} أيام على موعد الباك آب الأسبوعي
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% elif days_since_backup == 0 and last_backup_date %}
+            <!-- 🟢 تم الباك آب اليوم - رسالة نجاح -->
+            <div class="alert alert-success alert-dismissible fade show">
+                <i class="fas fa-check-circle ms-2"></i>
+                ✅ <strong>تم عمل نسخة احتياطية بنجاح!</strong>
+                <br>📅 تاريخ الباك آب: {{ last_backup_date }}
+                <br>📅 <strong>موعد الباك آب القادم:</strong> 
+                {% set next_backup = days_since_backup + 7 %}
+                بعد 7 أيام
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endif %}
+
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
