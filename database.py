@@ -168,6 +168,21 @@ class Database:
             )
         """)
 
+        # ✅ جديد: جدول تاريخ تحديث الحالات
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS request_status_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                request_id INTEGER NOT NULL,
+                old_status TEXT,
+                new_status TEXT NOT NULL,
+                updated_by INTEGER,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (request_id) REFERENCES service_requests(id),
+                FOREIGN KEY (updated_by) REFERENCES users(id)
+            )
+        """)
+
         conn.commit()
 
         self._create_default_branches(conn)
@@ -252,6 +267,28 @@ class Database:
                 print("✅ request_types table created with defaults!")
             else:
                 print("✅ request_types table already exists")
+
+            # ✅ جديد: Migration لـ request_status_history
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='request_status_history'")
+            if not cursor.fetchone():
+                print("❌ request_status_history table NOT found! Creating...")
+                cursor.execute("""
+                    CREATE TABLE request_status_history (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        request_id INTEGER NOT NULL,
+                        old_status TEXT,
+                        new_status TEXT NOT NULL,
+                        updated_by INTEGER,
+                        notes TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (request_id) REFERENCES service_requests(id),
+                        FOREIGN KEY (updated_by) REFERENCES users(id)
+                    )
+                """)
+                conn.commit()
+                print("✅ request_status_history table created!")
+            else:
+                print("✅ request_status_history table already exists")
 
             conn.close()
         except Exception as e:
@@ -870,6 +907,8 @@ class Database:
 
         # حذف الإشعارات المرتبطة بالطلب أولاً
         cursor.execute("DELETE FROM notifications WHERE request_id = ?", (request_id,))
+        # حذف تاريخ الحالات المرتبط بالطلب
+        cursor.execute("DELETE FROM request_status_history WHERE request_id = ?", (request_id,))
         # حذف الطلب
         cursor.execute("DELETE FROM service_requests WHERE id = ?", (request_id,))
 
@@ -877,6 +916,62 @@ class Database:
         conn.close()
 
         return True
+
+    # ✅ جديد: دوال تاريخ تحديث الحالات
+    def create_status_history(self, request_id: int, old_status: str, new_status: str, updated_by: int, notes: str = '') -> int:
+        """حفظ تاريخ تحديث حالة الطلب"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            INSERT INTO request_status_history (request_id, old_status, new_status, updated_by, notes)
+            VALUES (?, ?, ?, ?, ?)
+        """, (request_id, old_status, new_status, updated_by, notes))
+
+        history_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+
+        return history_id
+
+    def get_request_status_history(self, request_id: int) -> List[Dict]:
+        """الحصول على تاريخ تحديثات حالة الطلب"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT rsh.*, u.full_name as updater_name
+            FROM request_status_history rsh
+            LEFT JOIN users u ON rsh.updated_by = u.id
+            WHERE rsh.request_id = ?
+            ORDER BY rsh.created_at DESC
+        """, (request_id,))
+
+        history = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+
+        return history
+
+    def get_last_status_change(self, request_id: int) -> Optional[Dict]:
+        """الحصول على آخر تحديث حالة للطلب"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT rsh.*, u.full_name as updater_name
+            FROM request_status_history rsh
+            LEFT JOIN users u ON rsh.updated_by = u.id
+            WHERE rsh.request_id = ?
+            ORDER BY rsh.created_at DESC
+            LIMIT 1
+        """, (request_id,))
+
+        result = cursor.fetchone()
+        conn.close()
+
+        if result:
+            return dict(result)
+        return None
 
     def get_all_roles(self) -> List[Dict]:
         conn = self.get_connection()
