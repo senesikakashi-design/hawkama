@@ -74,13 +74,23 @@
                                 <th>المنشئ:</th>
                                 <td>{{ request.creator_name }}</td>
                             </tr>
+                            <!-- ✅ تاريخ الإنشاء بتوقيت بغداد -->
                             <tr>
                                 <th>تاريخ الإنشاء:</th>
-                                <td>{{ request.created_at[:16] }}</td>
+                                <td>
+                                    <span class="baghdad-date" data-utc="{{ request.created_at }}">
+                                        {{ request.created_at[:16] }}
+                                    </span>
+                                </td>
                             </tr>
+                            <!-- ✅ تاريخ آخر تحديث بتوقيت بغداد -->
                             <tr>
                                 <th>آخر تحديث:</th>
-                                <td>{{ request.updated_at[:16] }}</td>
+                                <td>
+                                    <span class="baghdad-date" data-utc="{{ request.updated_at }}">
+                                        {{ request.updated_at[:16] }}
+                                    </span>
+                                </td>
                             </tr>
                             {% if request.notes %}
                             <tr>
@@ -92,7 +102,7 @@
                     </div>
                 </div>
                 
-                <!-- ✅ جديد: تاريخ تحديثات الحالة -->
+                <!-- ✅ تاريخ تحديثات الحالة -->
                 {% if status_history %}
                 <div class="card shadow-sm mb-4">
                     <div class="card-header bg-info text-white">
@@ -104,8 +114,8 @@
                                 <thead>
                                     <tr>
                                         <th>التاريخ</th>
-                                        <th>الحالة القديمة</th>
-                                        <th>الحالة الجديدة</th>
+                                        <th>من</th>
+                                        <th>إلى</th>
                                         <th>بواسطة</th>
                                         <th>ملاحظات</th>
                                     </tr>
@@ -113,7 +123,9 @@
                                 <tbody>
                                     {% for history in status_history %}
                                     <tr>
-                                        <td>{{ history.created_at[:16] }}</td>
+                                        <td class="baghdad-date" data-utc="{{ history.created_at }}">
+                                            {{ history.created_at[:16] }}
+                                        </td>
                                         <td>
                                             {% if history.old_status == 'pending' %}
                                                 <span class="badge" style="background: #ff9800">قيد المعالجة</span>
@@ -212,5 +224,32 @@
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    // ✅ نفس طريقة التقارير - تحويل UTC إلى بغداد
+    function toBaghdadTime(dateString) {
+        const date = new Date(dateString);
+        const baghdadTime = new Date(date.getTime() + (3 * 60 * 60 * 1000));
+        
+        const year = baghdadTime.getFullYear();
+        const month = String(baghdadTime.getMonth() + 1).padStart(2, '0');
+        const day = String(baghdadTime.getDate()).padStart(2, '0');
+        const hours = String(baghdadTime.getHours()).padStart(2, '0');
+        const minutes = String(baghdadTime.getMinutes()).padStart(2, '0');
+        
+        return `${year}-${month}-${day} ${hours}:${minutes}`;
+    }
+
+    // ✅ تحويل جميع التواريخ عند تحميل الصفحة
+    document.addEventListener('DOMContentLoaded', function() {
+        const baghdadDateElements = document.querySelectorAll('.baghdad-date');
+        baghdadDateElements.forEach(function(element) {
+            const utcDate = element.getAttribute('data-utc');
+            if (utcDate) {
+                const baghdadDate = toBaghdadTime(utcDate);
+                element.textContent = baghdadDate;
+            }
+        });
+    });
+    </script>
 </body>
 </html>
