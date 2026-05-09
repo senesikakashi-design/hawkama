@@ -1,6 +1,6 @@
 """
 Enterprise Workflow System - v4.0
-نظام الحوكمة المتكامل - مع الصلاحيات والإشعارات
+نظام الحوكمة المتكامل - مع الصلاحيات والإشعارات وفلترة الأقسام
 """
 
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file, jsonify
@@ -115,17 +115,29 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    if current_user.role in ['compliance_officer', 'general_manager']:
+    # ✅ معدل: إحصائيات حسب الدور
+    if current_user.role == 'compliance_officer':
         stats = db.get_dashboard_stats()
+    elif current_user.role == 'department_head':
+        # ✅ مدير القسم - إحصائيات قسمه فقط
+        stats = db.get_dashboard_stats(current_user.id, current_user.department)
     else:
         stats = db.get_dashboard_stats(current_user.id)
+    
+    # ✅ معدل: فلترة الطلبات حسب الدور
     if current_user.permissions.get('can_view_requests', 0) or current_user.role in ['compliance_officer', 'general_manager', 'department_head']:
-        if current_user.role in ['compliance_officer', 'general_manager', 'department_head']:
+        if current_user.role == 'compliance_officer':
+            # مدير الامتثال يشوف كل الطلبات
             recent_requests = db.get_all_requests()[:5]
+        elif current_user.role == 'department_head':
+            # ✅ مدير القسم يشوف طلبات قسمه المستهدف فقط + طلباته
+            recent_requests = db.get_requests_by_department(current_user.department, current_user.id)[:5]
         else:
+            # الموظف العادي يشوف طلباته
             recent_requests = db.get_requests_by_user(current_user.id)[:5]
     else:
         recent_requests = []
+    
     unread_count = db.get_unread_count(current_user.id)
     
     # ✅ جديد: تاريخ آخر باك آب - يبحث بكل الأماكن
@@ -382,10 +394,18 @@ def requests():
     if not current_user.permissions.get('can_view_requests', 0) and current_user.role not in ['compliance_officer', 'general_manager', 'department_head']:
         flash('ليس لديك صلاحية لعرض الطلبات', 'danger')
         return redirect(url_for('dashboard'))
-    if current_user.role in ['compliance_officer', 'general_manager', 'department_head']:
+    
+    # ✅ معدل: فلترة حسب الصلاحية والقسم المستهدف
+    if current_user.role == 'compliance_officer':
+        # مدير الامتثال يشوف كل الطلبات
         requests_list = db.get_all_requests()
+    elif current_user.role == 'department_head':
+        # ✅ مدير القسم يشوف طلبات قسمه المستهدف فقط + طلباته الشخصية
+        requests_list = db.get_requests_by_department(current_user.department, current_user.id)
     else:
+        # الموظف العادي يشوف طلباته فقط
         requests_list = db.get_requests_by_user(current_user.id)
+    
     statuses = db.get_all_statuses()
     request_types = db.get_all_request_types()
     return render_template('requests.html', user=current_user, requests=requests_list, statuses=statuses, request_types=request_types)
@@ -397,6 +417,20 @@ def view_request(request_id):
     if not req:
         flash('الطلب غير موجود', 'danger')
         return redirect(url_for('requests'))
+
+    # ✅ جديد: التحقق من الصلاحية - مين يقدر يشوف الطلب
+    can_view = False
+    if current_user.role == 'compliance_officer':
+        can_view = True  # مدير الامتثال يشوف كل شي
+    elif req['created_by'] == current_user.id:
+        can_view = True  # المنشئ يشوف طلبه
+    elif current_user.role == 'department_head' and req.get('assigned_department') == current_user.department:
+        can_view = True  # ✅ مدير القسم المستهدف يشوف الطلب
+
+    if not can_view:
+        flash('ليس لديك صلاحية لعرض هذا الطلب', 'danger')
+        return redirect(url_for('requests'))
+
     statuses = db.get_all_statuses()
     
     # ✅ جديد: جلب تاريخ تحديثات الحالة
@@ -453,25 +487,28 @@ def delete_request(request_id):
 @login_required
 def new_request():
     if request.method == 'POST':
+        # ✅ معدل: إضافة assigned_department
         data = {
             'request_type': request.form.get('request_type'),
             'title': request.form.get('title'),
             'description': request.form.get('description'),
             'priority': request.form.get('priority', 'medium'),
             'created_by': current_user.id,
-            'department': request.form.get('department'),
+            'department': current_user.department,        # ✅ قسم الموظف المنشئ
+            'assigned_department': request.form.get('assigned_department'),  # ✅ القسم المستهدف
             'branch_id': current_user.branch_id
         }
 
         request_id = db.create_request(data)
 
+        # ✅ إشعار لمدير الامتثال فقط
         managers = db.get_all_users()
         for manager in managers:
-            if manager['role'] in ['compliance_officer', 'general_manager', 'department_head']:
+            if manager['role'] == 'compliance_officer':
                 db.create_notification(
                     manager['id'],
                     request_id,
-                    f"طلب جديد #{request_id} من {current_user.full_name}"
+                    f"طلب جديد #{request_id} من {current_user.full_name} - موجه لقسم: {data['assigned_department']}"
                 )
 
         flash(f'تم إنشاء الطلب #{request_id} بنجاح', 'success')
