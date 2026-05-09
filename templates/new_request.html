@@ -43,15 +43,19 @@
                                 </select>
                             </div>
                             
-                            <!-- ✅✅✅ جديد: اختيار القسم -->
+                            <!-- ✅ جديد: القسم المستهدف (اللي يشوف الطلب) -->
                             <div class="mb-3">
-                                <label class="form-label">القسم <span class="text-danger">*</span></label>
-                                <select class="form-select" name="department" required>
-                                    <option value="">-- اختر القسم --</option>
+                                <label class="form-label">القسم المستهدف <span class="text-danger">*</span></label>
+                                <select class="form-select" name="assigned_department" required>
+                                    <option value="">-- اختر القسم المستهدف --</option>
                                     {% for dept in departments %}
                                     <option value="{{ dept.dept_name }}">{{ dept.dept_name_ar }}</option>
                                     {% endfor %}
                                 </select>
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle"></i>
+                                    الطلب سيظهر فقط لهذا القسم ومدير الامتثال
+                                </small>
                             </div>
                             
                             <div class="mb-3">
