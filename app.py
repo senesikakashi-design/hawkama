@@ -312,6 +312,23 @@ def delete_user(user_id):
         flash(f'خطأ في حذف المستخدم: {str(e)}', 'danger')
     return redirect(url_for('manage_users'))
 
+# ✅ جديد: إعادة تعيين كلمة المرور
+@app.route('/users/reset_password/<int:user_id>')
+@login_required
+@permission_required('can_manage_users')
+def reset_user_password_route(user_id):
+    if user_id == current_user.id:
+        flash('لا يمكنك إعادة تعيين كلمة مرورك الخاصة!', 'danger')
+        return redirect(url_for('manage_users'))
+    
+    try:
+        db.reset_user_password(user_id)
+        flash('تم إعادة تعيين كلمة المرور إلى "hawk123456" بنجاح', 'success')
+    except Exception as e:
+        flash(f'خطأ: {str(e)}', 'danger')
+    
+    return redirect(url_for('manage_users'))
+
 @app.route('/users/export_excel')
 @login_required
 @permission_required('can_manage_users')
