@@ -128,7 +128,7 @@
                         <tbody>
                             {% for req in recent_requests %}
                             <tr>
-                                <td>{{ req.id }}</td>
+                                <td>{{ loop.index }}</td>
                                 <td>{{ req.title }}</td>
                                 <td>
                                     {% if req.status == 'pending' %}
