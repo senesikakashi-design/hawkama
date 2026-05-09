@@ -807,6 +807,25 @@ class Database:
 
         return True
 
+    # ✅ جديد: إعادة تعيين كلمة المرور
+    def reset_user_password(self, user_id: int, new_password: str = 'hawk123456') -> bool:
+        """إعادة تعيين كلمة المرور للمستخدم"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        hashed_password = self.hash_password(new_password)
+
+        cursor.execute("""
+            UPDATE users 
+            SET password = ?
+            WHERE id = ?
+        """, (hashed_password, user_id))
+
+        conn.commit()
+        conn.close()
+
+        return True
+
     def get_requests_by_user(self, user_id: int) -> List[Dict]:
         conn = self.get_connection()
         cursor = conn.cursor()
