@@ -1,5 +1,5 @@
 """
-Database Management Module - v4.0 with Permissions & Notifications
+Database Management Module - v4.0 with Permissions & Notifications & Department Filtering
 """
 
 import sqlite3
@@ -70,7 +70,7 @@ class Database:
             )
         """)
 
-        # جدول الطلبات
+        # ✅ جدول الطلبات - مع assigned_department
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS service_requests (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -82,6 +82,7 @@ class Database:
                 created_by INTEGER NOT NULL,
                 assigned_to INTEGER,
                 department TEXT,
+                assigned_department TEXT,
                 branch_id INTEGER,
                 notes TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -236,7 +237,7 @@ class Database:
                     conn.commit()
                     print("✅ can_backup migration done!")
 
-            # ✅ Migration لـ request_types - يضيف الجدول إذا ناقص
+            # ✅ Migration لـ request_types
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='request_types'")
             if not cursor.fetchone():
                 print("❌ request_types table NOT found! Creating...")
@@ -268,7 +269,7 @@ class Database:
             else:
                 print("✅ request_types table already exists")
 
-            # ✅ جديد: Migration لـ request_status_history
+            # ✅ Migration لـ request_status_history
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='request_status_history'")
             if not cursor.fetchone():
                 print("❌ request_status_history table NOT found! Creating...")
@@ -289,6 +290,17 @@ class Database:
                 print("✅ request_status_history table created!")
             else:
                 print("✅ request_status_history table already exists")
+
+            # ✅ جديد: Migration لـ assigned_department
+            cursor.execute("PRAGMA table_info(service_requests)")
+            columns = [column[1] for column in cursor.fetchall()]
+            if 'assigned_department' not in columns:
+                print("❌ assigned_department column NOT found! Adding...")
+                cursor.execute("ALTER TABLE service_requests ADD COLUMN assigned_department TEXT")
+                conn.commit()
+                print("✅ assigned_department column added!")
+            else:
+                print("✅ assigned_department column already exists")
 
             conn.close()
         except Exception as e:
@@ -844,6 +856,26 @@ class Database:
 
         return requests
 
+    # ✅ جديد: جلب طلبات قسم معين + طلبات المستخدم
+    def get_requests_by_department(self, department: str, user_id: int) -> List[Dict]:
+        """الحصول على طلبات قسم معين + طلبات المستخدم"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT sr.*, u.full_name as creator_name, b.name as branch_name
+            FROM service_requests sr
+            JOIN users u ON sr.created_by = u.id
+            LEFT JOIN branches b ON sr.branch_id = b.id
+            WHERE sr.assigned_department = ? OR sr.created_by = ?
+            ORDER BY sr.created_at DESC
+        """, (department, user_id))
+
+        requests = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+
+        return requests
+
     def get_all_requests(self) -> List[Dict]:
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -880,14 +912,15 @@ class Database:
             return dict(request)
         return None
 
+    # ✅ معدل: إضافة assigned_department
     def create_request(self, data: Dict) -> int:
         conn = self.get_connection()
         cursor = conn.cursor()
 
         cursor.execute("""
             INSERT INTO service_requests 
-            (request_type, title, description, priority, created_by, department, branch_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (request_type, title, description, priority, created_by, department, assigned_department, branch_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             data['request_type'],
             data['title'],
@@ -895,6 +928,7 @@ class Database:
             data.get('priority', 'medium'),
             data['created_by'],
             data.get('department', ''),
+            data.get('assigned_department', ''),  # ✅ القسم المستهدف
             data.get('branch_id')
         ))
 
@@ -1180,13 +1214,38 @@ class Database:
         conn.close()
         return True
 
-    def get_dashboard_stats(self, user_id: int = None) -> Dict:
+    def get_dashboard_stats(self, user_id: int = None, department: str = None) -> Dict:
         conn = self.get_connection()
         cursor = conn.cursor()
 
         stats = {}
 
-        if user_id:
+        if user_id and department:
+            # ✅ مدير قسم - يشوف طلبات قسمه المستهدف + طلباته
+            cursor.execute("""
+                SELECT COUNT(*) FROM service_requests 
+                WHERE created_by = ? OR assigned_department = ?
+            """, (user_id, department))
+            stats['total_requests'] = cursor.fetchone()[0]
+
+            cursor.execute("""
+                SELECT COUNT(*) FROM service_requests 
+                WHERE (created_by = ? OR assigned_department = ?) AND status = 'pending'
+            """, (user_id, department))
+            stats['pending_requests'] = cursor.fetchone()[0]
+
+            cursor.execute("""
+                SELECT COUNT(*) FROM service_requests 
+                WHERE (created_by = ? OR assigned_department = ?) AND status = 'in_progress'
+            """, (user_id, department))
+            stats['in_progress_requests'] = cursor.fetchone()[0]
+
+            cursor.execute("""
+                SELECT COUNT(*) FROM service_requests 
+                WHERE (created_by = ? OR assigned_department = ?) AND status = 'completed'
+            """, (user_id, department))
+            stats['completed_requests'] = cursor.fetchone()[0]
+        elif user_id:
             cursor.execute("SELECT COUNT(*) FROM service_requests WHERE created_by = ?", (user_id,))
             stats['total_requests'] = cursor.fetchone()[0]
 
