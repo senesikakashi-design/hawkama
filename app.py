@@ -340,8 +340,12 @@ def manage_users():
     roles_list = db.get_all_roles()
     departments_list = db.get_all_departments()
     
+    # ✅ جديد: قاموس الأدوار للترجمة السريعة
+    roles_dict = {role['role_name']: role['role_name_ar'] for role in roles_list}
+
     return render_template('manage_users.html', user=current_user, users=users_list, 
                           branches=branches_list, roles=roles_list, departments=departments_list,
+                          roles_dict=roles_dict,  # ✅ جديد
                           search_term=search_term, selected_branch=branch_id, 
                           selected_department=department, selected_role=role)
 
@@ -448,15 +452,7 @@ def export_users_excel():
             worksheet.write(row, 1, user['username'])
             worksheet.write(row, 2, user['full_name'])
             worksheet.write(row, 3, user.get('email', ''))
-            role_ar = ''
-            if user['role'] == 'compliance_officer':
-                role_ar = 'مسؤول الامتثال'
-            elif user['role'] == 'general_manager':
-                role_ar = 'مدير عام'
-            elif user['role'] == 'department_head':
-                role_ar = 'رئيس قسم'
-            else:
-                role_ar = 'موظف'
+            role_ar = db.get_role_name_ar(user['role'])  # ✅ جديد: ترجمة من قاعدة البيانات
             worksheet.write(row, 4, role_ar)
             worksheet.write(row, 5, user.get('department', ''))
             worksheet.write(row, 6, user.get('branch_name', ''))
