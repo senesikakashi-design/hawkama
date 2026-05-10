@@ -25,84 +25,138 @@
         
         <div class="page-header">
             <h1>👥 إدارة المستخدمين</h1>
-            <p>إضافة وتعديل وإدارة مستخدمي النظام</p>
+            <p>إضافة وتعديل وحذف المستخدمين</p>
         </div>
         
-        <div class="mb-4">
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
-                <i class="fas fa-plus ms-2"></i>
-                إضافة مستخدم جديد
-            </button>
-            
-            <a href="{{ url_for('export_users_excel') }}" class="btn btn-success">
-                <i class="fas fa-file-excel ms-2"></i>
-                تصدير Excel
-            </a>
+        <!-- ✅ فلاتر البحث -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-light">
+                <h6 class="mb-0"><i class="fas fa-filter ms-2"></i> فلترة البحث</h6>
+            </div>
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('manage_users') }}">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">بحث</label>
+                            <input type="text" class="form-control" name="search" value="{{ search_term }}" 
+                                   placeholder="اسم، يوزر، إيميل...">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">الفرع</label>
+                            <select class="form-select" name="branch_id">
+                                <option value="">الكل</option>
+                                {% for branch in branches %}
+                                <option value="{{ branch.id }}" {% if selected_branch == branch.id|string %}selected{% endif %}>
+                                    {{ branch.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">القسم</label>
+                            <select class="form-select" name="department">
+                                <option value="">الكل</option>
+                                {% for dept in departments %}
+                                <option value="{{ dept.dept_name }}" {% if selected_department == dept.dept_name %}selected{% endif %}>
+                                    {{ dept.dept_name_ar }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">الدور</label>
+                            <select class="form-select" name="role">
+                                <option value="">الكل</option>
+                                {% for role in roles %}
+                                <option value="{{ role.role_name }}" {% if selected_role == role.role_name %}selected{% endif %}>
+                                    {{ role.role_name_ar }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-1 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-12">
+                            <a href="{{ url_for('manage_users') }}" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-undo"></i> إعادة تعيين
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
         </div>
         
         <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-users ms-2"></i> قائمة المستخدمين</h5>
+                <div>
+                    <a href="{{ url_for('export_users_excel') }}" class="btn btn-success btn-sm me-2">
+                        <i class="fas fa-file-excel"></i> تصدير Excel
+                    </a>
+                    <button class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                        <i class="fas fa-plus"></i> إضافة مستخدم
+                    </button>
+                </div>
+            </div>
             <div class="card-body">
                 <div class="table-responsive">
                     <table class="table table-hover">
-                        <thead>
+                        <thead class="table-dark">
                             <tr>
                                 <th>#</th>
-                                <th>اسم المستخدم</th>
-                                <th>الاسم الكامل</th>
-                                <th>البريد</th>
-                                <th>الدور</th>
+                                <th>اليوزر</th>
+                                <th>الاسم</th>
                                 <th>القسم</th>
+                                <th>الدور</th>
                                 <th>الفرع</th>
                                 <th>الحالة</th>
-                                <th>الإجراءات</th>
+                                <th>إجراءات</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for u in users %}
+                            {% for user in users %}
                             <tr>
-                                <td>{{ loop.index }}</td>
-                                <td><strong>{{ u.username }}</strong></td>
-                                <td>{{ u.full_name }}</td>
-                                <td>{{ u.email }}</td>
+                                <td>{{ user.id }}</td>
+                                <td>{{ user.username }}</td>
+                                <td>{{ user.full_name }}</td>
+                                <td>{{ user.department }}</td>
                                 <td>
-                                    {% if u.role == 'compliance_officer' %}
-                                        <span class="badge badge-danger">مسؤول الامتثال</span>
-                                    {% elif u.role == 'general_manager' %}
-                                        <span class="badge badge-primary">مدير عام</span>
-                                    {% elif u.role == 'department_head' %}
-                                        <span class="badge badge-warning">رئيس قسم</span>
+                                    {% if user.role == 'compliance_officer' %}
+                                    <span class="badge bg-danger">مسؤول الامتثال</span>
+                                    {% elif user.role == 'general_manager' %}
+                                    <span class="badge bg-primary">مدير عام</span>
+                                    {% elif user.role == 'department_head' %}
+                                    <span class="badge bg-warning text-dark">رئيس قسم</span>
                                     {% else %}
-                                        <span class="badge badge-success">موظف</span>
+                                    <span class="badge bg-secondary">موظف</span>
                                     {% endif %}
                                 </td>
-                                <td>{{ u.department }}</td>
-                                <td>{{ u.branch_name or '-' }}</td>
+                                <td>{{ user.branch_name or '-' }}</td>
                                 <td>
-                                    {% if u.is_active %}
-                                        <span class="badge badge-success">نشط</span>
+                                    {% if user.is_active %}
+                                    <span class="badge bg-success">نشط</span>
                                     {% else %}
-                                        <span class="badge badge-danger">معطل</span>
+                                    <span class="badge bg-danger">معطل</span>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <button class="btn btn-sm btn-primary" onclick="editUser({{ u.id }}, '{{ u.username }}', '{{ u.full_name }}', '{{ u.email }}', '{{ u.role }}', '{{ u.department }}', {{ u.branch_id or 'null' }}, {{ u.is_active }})" title="تعديل">
+                                    <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#editUser{{ user.id }}">
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    
-                                    <a href="{{ url_for('toggle_user', user_id=u.id) }}" class="btn btn-sm btn-warning" onclick="return confirm('هل أنت متأكد؟')" title="تفعيل/تعطيل">
-                                        <i class="fas fa-power-off"></i>
+                                    <a href="{{ url_for('toggle_user', user_id=user.id) }}" class="btn btn-sm btn-warning">
+                                        <i class="fas fa-toggle-on"></i>
                                     </a>
-                                    
-                                    {% if u.id != user.id %}
-                                    <!-- ✅ جديد: زر إعادة تعيين كلمة المرور -->
-                                    <a href="{{ url_for('reset_user_password_route', user_id=u.id) }}" class="btn btn-sm btn-info" onclick="return confirm('⚠️ سيتم إعادة تعيين كلمة المرور إلى hawk123456\nهل أنت متأكد؟')" title="إعادة تعيين كلمة المرور">
+                                    <a href="{{ url_for('reset_user_password_route', user_id=user.id) }}" class="btn btn-sm btn-secondary" onclick="return confirm('إعادة تعيين كلمة المرور إلى hawk123456؟')">
                                         <i class="fas fa-key"></i>
                                     </a>
-                                    
-                                    <a href="{{ url_for('delete_user', user_id=u.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('⚠️ تحذير: سيتم حذف المستخدم نهائياً! هل أنت متأكد؟')" title="حذف">
+                                    <a href="{{ url_for('delete_user', user_id=user.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('هل أنت متأكد؟')">
                                         <i class="fas fa-trash"></i>
                                     </a>
-                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
@@ -113,55 +167,62 @@
         </div>
     </div>
     
+    <!-- Modal إضافة مستخدم -->
     <div class="modal fade" id="addUserModal" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <div class="modal-header">
+                <div class="modal-header bg-primary text-white">
                     <h5 class="modal-title">إضافة مستخدم جديد</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form method="POST" action="{{ url_for('add_user') }}">
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label">اسم المستخدم</label>
-                            <input type="text" class="form-control" name="username" required>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">اسم المستخدم</label>
+                                <input type="text" class="form-control" name="username" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">كلمة المرور</label>
+                                <input type="password" class="form-control" name="password" required>
+                            </div>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">كلمة المرور</label>
-                            <input type="password" class="form-control" name="password" required>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">الاسم الكامل</label>
+                                <input type="text" class="form-control" name="full_name" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">البريد الإلكتروني</label>
+                                <input type="email" class="form-control" name="email">
+                            </div>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">الاسم الكامل</label>
-                            <input type="text" class="form-control" name="full_name" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">البريد الإلكتروني</label>
-                            <input type="email" class="form-control" name="email">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">الدور</label>
-                            <select class="form-select" name="role" required>
-                                {% for role in roles %}
-                                <option value="{{ role.role_name }}">{{ role.role_name_ar }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">القسم</label>
-                            <select class="form-select" name="department" required>
-                                {% for dept in departments %}
-                                <option value="{{ dept.dept_name }}">{{ dept.dept_name_ar }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">الفرع</label>
-                            <select class="form-select" name="branch_id">
-                                <option value="">بدون فرع</option>
-                                {% for branch in branches %}
-                                <option value="{{ branch.id }}">{{ branch.name }}</option>
-                                {% endfor %}
-                            </select>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">الدور</label>
+                                <select class="form-select" name="role" required>
+                                    {% for role in roles %}
+                                    <option value="{{ role.role_name }}">{{ role.role_name_ar }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">القسم</label>
+                                <select class="form-select" name="department" required>
+                                    {% for dept in departments %}
+                                    <option value="{{ dept.dept_name }}">{{ dept.dept_name_ar }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">الفرع</label>
+                                <select class="form-select" name="branch_id">
+                                    <option value="">بدون فرع</option>
+                                    {% for branch in branches %}
+                                    <option value="{{ branch.id }}">{{ branch.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -173,88 +234,6 @@
         </div>
     </div>
     
-    <div class="modal fade" id="editUserModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">تعديل المستخدم</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form method="POST" id="editUserForm">
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label">اسم المستخدم</label>
-                            <input type="text" class="form-control" id="edit_username" disabled>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">كلمة مرور جديدة (اختياري)</label>
-                            <input type="password" class="form-control" name="new_password" placeholder="اتركه فارغاً للإبقاء على القديمة">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">الاسم الكامل</label>
-                            <input type="text" class="form-control" name="full_name" id="edit_full_name" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">البريد الإلكتروني</label>
-                            <input type="email" class="form-control" name="email" id="edit_email">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">الدور</label>
-                            <select class="form-select" name="role" id="edit_role" required>
-                                {% for role in roles %}
-                                <option value="{{ role.role_name }}">{{ role.role_name_ar }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">القسم</label>
-                            <select class="form-select" name="department" id="edit_department" required>
-                                {% for dept in departments %}
-                                <option value="{{ dept.dept_name }}">{{ dept.dept_name_ar }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">الفرع</label>
-                            <select class="form-select" name="branch_id" id="edit_branch">
-                                <option value="">بدون فرع</option>
-                                {% for branch in branches %}
-                                <option value="{{ branch.id }}">{{ branch.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">الحالة</label>
-                            <select class="form-select" name="is_active" id="edit_active">
-                                <option value="1">نشط</option>
-                                <option value="0">معطل</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                        <button type="submit" class="btn btn-primary">حفظ التعديلات</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        function editUser(id, username, full_name, email, role, department, branch_id, active) {
-            document.getElementById('editUserForm').action = '/users/edit/' + id;
-            document.getElementById('edit_username').value = username;
-            document.getElementById('edit_full_name').value = full_name;
-            document.getElementById('edit_email').value = email;
-            document.getElementById('edit_role').value = role;
-            document.getElementById('edit_department').value = department;
-            document.getElementById('edit_branch').value = branch_id || '';
-            document.getElementById('edit_active').value = active;
-            
-            var editModal = new bootstrap.Modal(document.getElementById('editUserModal'));
-            editModal.show();
-        }
-    </script>
 </body>
 </html>
