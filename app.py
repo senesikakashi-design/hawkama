@@ -1,6 +1,8 @@
 """
-Enterprise Workflow System - v4.0
-نظام الحوكمة المتكامل - مع الصلاحيات والإشعارات وفلترة الأقسام
+╔═══════════════════════════════════════════════════════════════╗
+║  🏛️  نظام الحوكمة المتكامل - HAWKAMA v4.0                    ║
+║  📅 آخر تحديث: 2026-05-10                                    ║
+╚═══════════════════════════════════════════════════════════════╝
 """
 
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file, jsonify
@@ -82,6 +84,10 @@ def permission_required(permission_name):
         return decorated_function
     return decorator
 
+# ═══════════════════════════════════════════════════════════
+# 🏠 الصفحة الرئيسية والدخول - HOME & LOGIN
+# ═══════════════════════════════════════════════════════════
+
 @app.route('/')
 def index():
     if current_user.is_authenticated:
@@ -111,6 +117,10 @@ def logout():
     logout_user()
     flash('تم تسجيل الخروج بنجاح', 'success')
     return redirect(url_for('login'))
+
+# ═══════════════════════════════════════════════════════════
+# 📊 لوحة التحكم - DASHBOARD
+# ═══════════════════════════════════════════════════════════
 
 @app.route('/dashboard')
 @login_required
@@ -177,13 +187,25 @@ def dashboard():
         last_backup_date=last_backup_date, 
         days_since_backup=days_since_backup)
 
-# ==================== الفروع ====================
+# ═══════════════════════════════════════════════════════════
+# 🏢 إدارة الفروع - BRANCHES MANAGEMENT
+# ═══════════════════════════════════════════════════════════
+
 @app.route('/branches/manage')
 @login_required
 @permission_required('can_manage_branches')
 def manage_branches():
-    branches_list = db.get_all_branches(include_inactive=True)
-    return render_template('manage_branches.html', user=current_user, branches=branches_list)
+    search_term = request.args.get('search', '')
+    location = request.args.get('location', '')
+    status = request.args.get('status', '')
+    
+    if search_term or location or status:
+        branches_list = db.search_branches(search_term, location, status)
+    else:
+        branches_list = db.get_all_branches(include_inactive=True)
+    
+    return render_template('manage_branches.html', user=current_user, branches=branches_list, 
+                          search_term=search_term, location=location, status=status)
 
 @app.route('/branches/add', methods=['POST'])
 @login_required
@@ -245,16 +267,83 @@ def delete_branch(branch_id):
         flash(f'خطأ في حذف الفرع: {str(e)}', 'danger')
     return redirect(url_for('manage_branches'))
 
-# ==================== المستخدمين ====================
+# ✅ جديد: تصدير الفروع Excel
+@app.route('/branches/export_excel')
+@login_required
+@permission_required('can_manage_branches')
+def export_branches_excel():
+    try:
+        import xlsxwriter
+        branches_list = db.get_all_branches(include_inactive=True)
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output)
+        worksheet = workbook.add_worksheet('الفروع')
+        
+        header_format = workbook.add_format({
+            'bold': True, 
+            'bg_color': '#1a237e', 
+            'font_color': 'white', 
+            'align': 'center',
+            'border': 1
+        })
+        
+        cell_format = workbook.add_format({'align': 'center', 'border': 1})
+        
+        headers = ['#', 'الكود', 'الاسم', 'الموقع', 'المدير', 'الهاتف', 'الحالة']
+        
+        for col, header in enumerate(headers):
+            worksheet.write(0, col, header, header_format)
+        
+        for row, branch in enumerate(branches_list, start=1):
+            worksheet.write(row, 0, branch['id'], cell_format)
+            worksheet.write(row, 1, branch['code'], cell_format)
+            worksheet.write(row, 2, branch['name'], cell_format)
+            worksheet.write(row, 3, branch.get('location', ''), cell_format)
+            worksheet.write(row, 4, branch.get('manager_name', ''), cell_format)
+            worksheet.write(row, 5, branch.get('contact_phone', ''), cell_format)
+            worksheet.write(row, 6, 'نشط' if branch['is_active'] else 'معطل', cell_format)
+        
+        worksheet.set_column(0, 0, 8)
+        worksheet.set_column(1, 1, 15)
+        worksheet.set_column(2, 2, 25)
+        worksheet.set_column(3, 5, 20)
+        worksheet.set_column(6, 6, 12)
+        
+        workbook.close()
+        output.seek(0)
+        filename = f'branches_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        return send_file(output, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 
+                        as_attachment=True, download_name=filename)
+    except Exception as e:
+        flash(f'خطأ في تصدير Excel: {str(e)}', 'danger')
+        return redirect(url_for('manage_branches'))
+
+# ═══════════════════════════════════════════════════════════
+# 👤 إدارة المستخدمين - USERS MANAGEMENT
+# ═══════════════════════════════════════════════════════════
+
 @app.route('/users/manage')
 @login_required
 @permission_required('can_manage_users')
 def manage_users():
-    users_list = db.get_all_users(include_inactive=True)
+    search_term = request.args.get('search', '')
+    branch_id = request.args.get('branch_id', '')
+    department = request.args.get('department', '')
+    role = request.args.get('role', '')
+    
+    if search_term or branch_id or department or role:
+        users_list = db.search_users(search_term, branch_id, department, role)
+    else:
+        users_list = db.get_all_users(include_inactive=True)
+    
     branches_list = db.get_all_branches()
     roles_list = db.get_all_roles()
     departments_list = db.get_all_departments()
-    return render_template('manage_users.html', user=current_user, users=users_list, branches=branches_list, roles=roles_list, departments=departments_list)
+    
+    return render_template('manage_users.html', user=current_user, users=users_list, 
+                          branches=branches_list, roles=roles_list, departments=departments_list,
+                          search_term=search_term, selected_branch=branch_id, 
+                          selected_department=department, selected_role=role)
 
 @app.route('/users/add', methods=['POST'])
 @login_required
@@ -324,7 +413,6 @@ def delete_user(user_id):
         flash(f'خطأ في حذف المستخدم: {str(e)}', 'danger')
     return redirect(url_for('manage_users'))
 
-# ✅ جديد: إعادة تعيين كلمة المرور
 @app.route('/users/reset_password/<int:user_id>')
 @login_required
 @permission_required('can_manage_users')
@@ -387,7 +475,10 @@ def export_users_excel():
         flash(f'خطأ في تصدير Excel: {str(e)}', 'danger')
         return redirect(url_for('manage_users'))
 
-# ==================== الطلبات ====================
+# ═══════════════════════════════════════════════════════════
+# 📋 إدارة الطلبات - REQUESTS MANAGEMENT
+# ═══════════════════════════════════════════════════════════
+
 @app.route('/requests')
 @login_required
 def requests():
@@ -395,20 +486,40 @@ def requests():
         flash('ليس لديك صلاحية لعرض الطلبات', 'danger')
         return redirect(url_for('dashboard'))
     
+    status_filter = request.args.get('status', '')
+    department_filter = request.args.get('assigned_department', '')
+    search_term = request.args.get('search', '')
+    
     # ✅ معدل: فلترة حسب الصلاحية والقسم المستهدف
     if current_user.role == 'compliance_officer':
-        # مدير الامتثال يشوف كل الطلبات
-        requests_list = db.get_all_requests()
+        # مدير الامتثال يشوف كل الطلبات مع الفلترة
+        if status_filter or department_filter or search_term:
+            requests_list = db.search_requests(status_filter, department_filter, search_term)
+        else:
+            requests_list = db.get_all_requests()
     elif current_user.role == 'department_head':
         # ✅ مدير القسم يشوف طلبات قسمه المستهدف فقط + طلباته الشخصية
         requests_list = db.get_requests_by_department(current_user.department, current_user.id)
+        # تطبيق الفلترة الإضافية
+        if status_filter:
+            requests_list = [r for r in requests_list if r['status'] == status_filter]
+        if search_term:
+            requests_list = [r for r in requests_list if search_term.lower() in r['title'].lower()]
     else:
         # الموظف العادي يشوف طلباته فقط
         requests_list = db.get_requests_by_user(current_user.id)
+        if status_filter:
+            requests_list = [r for r in requests_list if r['status'] == status_filter]
+        if search_term:
+            requests_list = [r for r in requests_list if search_term.lower() in r['title'].lower()]
     
     statuses = db.get_all_statuses()
     request_types = db.get_all_request_types()
-    return render_template('requests.html', user=current_user, requests=requests_list, statuses=statuses, request_types=request_types)
+    departments = db.get_all_departments()
+    
+    return render_template('requests.html', user=current_user, requests=requests_list, 
+                          statuses=statuses, request_types=request_types, departments=departments,
+                          status_filter=status_filter, department_filter=department_filter, search_term=search_term)
 
 @app.route('/requests/view/<int:request_id>')
 @login_required
@@ -518,7 +629,10 @@ def new_request():
     departments = db.get_all_departments()
     return render_template('new_request.html', user=current_user, request_types=request_types, departments=departments)
 
-# ==================== متغيرات النظام ====================
+# ═══════════════════════════════════════════════════════════
+# ⚙️ متغيرات النظام - SYSTEM VARIABLES
+# ═══════════════════════════════════════════════════════════
+
 @app.route('/system/variables')
 @login_required
 @permission_required('can_manage_system_vars')
@@ -664,7 +778,10 @@ def delete_request_type(type_id):
         flash(f'خطأ: {str(e)}', 'danger')
     return redirect(url_for('system_variables'))
 
-# ==================== الصلاحيات ====================
+# ═══════════════════════════════════════════════════════════
+# 🔐 الصلاحيات - PERMISSIONS
+# ═══════════════════════════════════════════════════════════
+
 @app.route('/permissions/manage')
 @login_required
 def manage_permissions():
@@ -701,7 +818,10 @@ def set_user_permissions_api(user_id):
     except Exception as e:
         return jsonify({'success': False, 'message': f'خطأ: {str(e)}'}), 500
 
-# ==================== الإشعارات ====================
+# ═══════════════════════════════════════════════════════════
+# 🔔 الإشعارات - NOTIFICATIONS
+# ═══════════════════════════════════════════════════════════
+
 @app.route('/api/notifications/unread')
 @login_required
 def get_unread_notifications():
@@ -722,7 +842,10 @@ def get_status_history_api(request_id):
     history = db.get_request_status_history(request_id)
     return jsonify({'history': history})
 
-# ==================== التقارير ====================
+# ═══════════════════════════════════════════════════════════
+# 📊 التقارير - REPORTS
+# ═══════════════════════════════════════════════════════════
+
 @app.route('/reports')
 @login_required
 @permission_required('can_view_reports')
@@ -777,7 +900,10 @@ def export_excel():
         flash(f'خطأ في تصدير Excel: {str(e)}', 'danger')
         return redirect(url_for('reports'))
 
-# ==================== النسخ الاحتياطي ====================
+# ═══════════════════════════════════════════════════════════
+# 💾 النسخ الاحتياطي - BACKUP
+# ═══════════════════════════════════════════════════════════
+
 @app.route('/backup/download')
 @login_required
 @permission_required('can_backup')
