@@ -1,5 +1,8 @@
 """
-Database Management Module - v4.0 with Permissions & Notifications & Department Filtering
+╔═══════════════════════════════════════════════════════════════╗
+║  🏛️  نظام الحوكمة المتكامل - HAWKAMA v4.0                    ║
+║  📅 آخر تحديث: 2026-05-10                                    ║
+╚═══════════════════════════════════════════════════════════════╝
 """
 
 import sqlite3
@@ -33,6 +36,10 @@ class Database:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         return conn
+
+    # ═══════════════════════════════════════════════════════════
+    # 🏗️ تهيئة قاعدة البيانات - DATABASE INIT
+    # ═══════════════════════════════════════════════════════════
 
     def init_database(self):
         """تهيئة قاعدة البيانات"""
@@ -195,6 +202,10 @@ class Database:
 
         conn.close()
 
+    # ═══════════════════════════════════════════════════════════
+    # 🔄 Migration - ترقية قاعدة البيانات
+    # ═══════════════════════════════════════════════════════════
+
     def _migrate_database(self):
         """إضافة أعمدة/جداول جديدة إذا ما موجودة"""
         try:
@@ -307,6 +318,10 @@ class Database:
             print(f"Migration error: {e}")
             import traceback
             print(traceback.format_exc())
+
+    # ═══════════════════════════════════════════════════════════
+    # 🏢 البيانات الافتراضية - DEFAULT DATA
+    # ═══════════════════════════════════════════════════════════
 
     def _create_default_branches(self, conn):
         cursor = conn.cursor()
@@ -452,6 +467,10 @@ class Database:
 
         conn.commit()
 
+    # ═══════════════════════════════════════════════════════════
+    # 🔐 المصادقة والصلاحيات - AUTH & PERMISSIONS
+    # ═══════════════════════════════════════════════════════════
+
     @staticmethod
     def hash_password(password: str) -> str:
         return hashlib.sha256(password.encode()).hexdigest()
@@ -563,6 +582,10 @@ class Database:
 
         return True
 
+    # ═══════════════════════════════════════════════════════════
+    # 🔔 الإشعارات - NOTIFICATIONS
+    # ═══════════════════════════════════════════════════════════
+
     def create_notification(self, user_id: int, request_id: int, message: str) -> int:
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -616,6 +639,10 @@ class Database:
         conn.close()
 
         return count
+
+    # ═══════════════════════════════════════════════════════════
+    # 🏢 إدارة الفروع - BRANCHES MANAGEMENT
+    # ═══════════════════════════════════════════════════════════
 
     def get_all_branches(self, include_inactive=False) -> List[Dict]:
         conn = self.get_connection()
@@ -703,6 +730,10 @@ class Database:
         conn.close()
 
         return True
+
+    # ═══════════════════════════════════════════════════════════
+    # 👤 إدارة المستخدمين - USERS MANAGEMENT
+    # ═══════════════════════════════════════════════════════════
 
     def get_all_users(self, include_inactive=False) -> List[Dict]:
         conn = self.get_connection()
@@ -819,7 +850,6 @@ class Database:
 
         return True
 
-    # ✅ جديد: إعادة تعيين كلمة المرور
     def reset_user_password(self, user_id: int, new_password: str = 'hawk123456') -> bool:
         """إعادة تعيين كلمة المرور للمستخدم"""
         conn = self.get_connection()
@@ -837,6 +867,10 @@ class Database:
         conn.close()
 
         return True
+
+    # ═══════════════════════════════════════════════════════════
+    # 📋 إدارة الطلبات - REQUESTS MANAGEMENT
+    # ═══════════════════════════════════════════════════════════
 
     def get_requests_by_user(self, user_id: int) -> List[Dict]:
         conn = self.get_connection()
@@ -856,7 +890,6 @@ class Database:
 
         return requests
 
-    # ✅ جديد: جلب طلبات قسم معين + طلبات المستخدم
     def get_requests_by_department(self, department: str, user_id: int) -> List[Dict]:
         """الحصول على طلبات قسم معين + طلبات المستخدم"""
         conn = self.get_connection()
@@ -912,7 +945,6 @@ class Database:
             return dict(request)
         return None
 
-    # ✅ معدل: إضافة assigned_department
     def create_request(self, data: Dict) -> int:
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -928,7 +960,7 @@ class Database:
             data.get('priority', 'medium'),
             data['created_by'],
             data.get('department', ''),
-            data.get('assigned_department', ''),  # ✅ القسم المستهدف
+            data.get('assigned_department', ''),
             data.get('branch_id')
         ))
 
@@ -970,7 +1002,10 @@ class Database:
 
         return True
 
-    # ✅ جديد: دوال تاريخ تحديث الحالات
+    # ═══════════════════════════════════════════════════════════
+    # 📊 تاريخ تحديث الحالات - STATUS HISTORY
+    # ═══════════════════════════════════════════════════════════
+
     def create_status_history(self, request_id: int, old_status: str, new_status: str, updated_by: int, notes: str = '') -> int:
         """حفظ تاريخ تحديث حالة الطلب"""
         conn = self.get_connection()
@@ -1025,6 +1060,10 @@ class Database:
         if result:
             return dict(result)
         return None
+
+    # ═══════════════════════════════════════════════════════════
+    # ⚙️ متغيرات النظام - SYSTEM VARIABLES
+    # ═══════════════════════════════════════════════════════════
 
     def get_all_roles(self) -> List[Dict]:
         conn = self.get_connection()
@@ -1214,6 +1253,10 @@ class Database:
         conn.close()
         return True
 
+    # ═══════════════════════════════════════════════════════════
+    # 📊 الإحصائيات - DASHBOARD STATS
+    # ═══════════════════════════════════════════════════════════
+
     def get_dashboard_stats(self, user_id: int = None, department: str = None) -> Dict:
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -1279,6 +1322,10 @@ class Database:
         conn.close()
         return stats
 
+    # ═══════════════════════════════════════════════════════════
+    # 💾 النسخ الاحتياطي - BACKUP
+    # ═══════════════════════════════════════════════════════════
+
     def backup_database(self, backup_dir: str = None) -> str:
         if backup_dir is None:
             backup_dir = 'backups'
@@ -1305,3 +1352,106 @@ class Database:
         except Exception as e:
             print(f"Error restoring database: {e}")
             return False
+
+    # ═══════════════════════════════════════════════════════════
+    # 🔍 البحث والفلترة - SEARCH & FILTER (جديد)
+    # ═══════════════════════════════════════════════════════════
+
+    def search_branches(self, search_term: str = '', location: str = '', status: str = '') -> List[Dict]:
+        """بحث وفلترة الفروع"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        query = "SELECT * FROM branches WHERE 1=1"
+        params = []
+
+        if search_term:
+            query += " AND (name LIKE ? OR code LIKE ? OR manager_name LIKE ?)"
+            params.extend([f'%{search_term}%', f'%{search_term}%', f'%{search_term}%'])
+
+        if location:
+            query += " AND location LIKE ?"
+            params.append(f'%{location}%')
+
+        if status:
+            query += " AND is_active = ?"
+            params.append(1 if status == 'active' else 0)
+
+        query += " ORDER BY name"
+
+        cursor.execute(query, params)
+        branches = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+
+        return branches
+
+    def search_users(self, search_term: str = '', branch_id: str = '', department: str = '', role: str = '') -> List[Dict]:
+        """بحث وفلترة المستخدمين"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        query = """
+            SELECT u.*, b.name as branch_name 
+            FROM users u
+            LEFT JOIN branches b ON u.branch_id = b.id
+            WHERE 1=1
+        """
+        params = []
+
+        if search_term:
+            query += " AND (u.username LIKE ? OR u.full_name LIKE ? OR u.email LIKE ?)"
+            params.extend([f'%{search_term}%', f'%{search_term}%', f'%{search_term}%'])
+
+        if branch_id:
+            query += " AND u.branch_id = ?"
+            params.append(int(branch_id))
+
+        if department:
+            query += " AND u.department = ?"
+            params.append(department)
+
+        if role:
+            query += " AND u.role = ?"
+            params.append(role)
+
+        query += " ORDER BY u.full_name"
+
+        cursor.execute(query, params)
+        users = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+
+        return users
+
+    def search_requests(self, status: str = '', assigned_department: str = '', search_term: str = '') -> List[Dict]:
+        """بحث وفلترة الطلبات"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        query = """
+            SELECT sr.*, u.full_name as creator_name, b.name as branch_name
+            FROM service_requests sr
+            JOIN users u ON sr.created_by = u.id
+            LEFT JOIN branches b ON sr.branch_id = b.id
+            WHERE 1=1
+        """
+        params = []
+
+        if search_term:
+            query += " AND (sr.title LIKE ? OR sr.description LIKE ? OR sr.id LIKE ?)"
+            params.extend([f'%{search_term}%', f'%{search_term}%', f'%{search_term}%'])
+
+        if status:
+            query += " AND sr.status = ?"
+            params.append(status)
+
+        if assigned_department:
+            query += " AND sr.assigned_department = ?"
+            params.append(assigned_department)
+
+        query += " ORDER BY sr.created_at DESC"
+
+        cursor.execute(query, params)
+        requests = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+
+        return requests
