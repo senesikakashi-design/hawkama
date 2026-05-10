@@ -1112,6 +1112,23 @@ class Database:
         conn.close()
         return True
 
+    def get_role_name_ar(self, role_name: str) -> str:
+        """الحصول على اسم الدور بالعربي من قاعدة البيانات"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT role_name_ar FROM system_roles 
+            WHERE role_name = ? AND is_active = 1
+        """, (role_name,))
+
+        result = cursor.fetchone()
+        conn.close()
+
+        if result:
+            return result['role_name_ar']
+        return 'موظف'  # fallback إذا ما لقى الدور
+
     def get_all_departments(self) -> List[Dict]:
         conn = self.get_connection()
         cursor = conn.cursor()
