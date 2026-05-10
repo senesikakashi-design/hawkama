@@ -113,7 +113,7 @@
                         <tbody>
                             {% for req in requests %}
                             <tr>
-                                <td>{{ req.id }}</td>
+                                <td>{{ loop.index }}</td>
                                 <td>{{ req.title }}</td>
                                 <td>{{ req.request_type }}</td>
                                 <td>
