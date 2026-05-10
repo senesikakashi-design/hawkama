@@ -7,10 +7,11 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<base target="_blank">
 </head>
 <body>
     {% include 'sidebar.html' %}
-    
+
     <div class="main-content">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -22,12 +23,12 @@
                 {% endfor %}
             {% endif %}
         {% endwith %}
-        
+
         <div class="page-header">
             <h1>👥 إدارة المستخدمين</h1>
             <p>إضافة وتعديل وحذف المستخدمين</p>
         </div>
-        
+
         <!-- ✅ فلاتر البحث -->
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-light">
@@ -90,7 +91,7 @@
                 </form>
             </div>
         </div>
-        
+
         <div class="card shadow-sm">
             <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="fas fa-users ms-2"></i> قائمة المستخدمين</h5>
@@ -125,16 +126,9 @@
                                 <td>{{ user.username }}</td>
                                 <td>{{ user.full_name }}</td>
                                 <td>{{ user.department }}</td>
+                                <!-- ✅ معدل: استخدام roles_dict للترجمة الديناميكية -->
                                 <td>
-                                    {% if user.role == 'compliance_officer' %}
-                                    <span class="badge bg-danger">مسؤول الامتثال</span>
-                                    {% elif user.role == 'general_manager' %}
-                                    <span class="badge bg-primary">مدير عام</span>
-                                    {% elif user.role == 'department_head' %}
-                                    <span class="badge bg-warning text-dark">رئيس قسم</span>
-                                    {% else %}
-                                    <span class="badge bg-secondary">موظف</span>
-                                    {% endif %}
+                                    <span class="badge bg-info">{{ roles_dict.get(user.role, 'موظف') }}</span>
                                 </td>
                                 <td>{{ user.branch_name or '-' }}</td>
                                 <td>
@@ -168,7 +162,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Modal إضافة مستخدم -->
     <div class="modal fade" id="addUserModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
@@ -235,7 +229,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Modals تعديل المستخدمين -->
     {% for user in users %}
     <div class="modal fade" id="editUser{{ user.id }}" tabindex="-1" aria-hidden="true">
@@ -313,7 +307,7 @@
         </div>
     </div>
     {% endfor %}
-    
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
