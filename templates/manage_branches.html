@@ -101,7 +101,7 @@
                         <tbody>
                             {% for branch in branches %}
                             <tr>
-                                <td>{{ branch.id }}</td>
+                                <td>{{ loop.index }}</td>
                                 <td><span class="badge bg-secondary">{{ branch.code }}</span></td>
                                 <td>{{ branch.name }}</td>
                                 <td>{{ branch.location or '-' }}</td>
