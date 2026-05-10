@@ -12,189 +12,92 @@
     {% include 'sidebar.html' %}
     
     <div class="main-content">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+        <!-- ... (الفلاتر نفسها) ... -->
         
-        <div class="page-header">
-            <h1>👥 إدارة المستخدمين</h1>
-            <p>إضافة وتعديل وحذف المستخدمين</p>
-        </div>
-        
-        <!-- ✅ فلاتر البحث -->
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-light">
-                <h6 class="mb-0"><i class="fas fa-filter ms-2"></i> فلترة البحث</h6>
-            </div>
-            <div class="card-body">
-                <form method="GET" action="{{ url_for('manage_users') }}">
-                    <div class="row g-3">
-                        <div class="col-md-3">
-                            <label class="form-label">بحث</label>
-                            <input type="text" class="form-control" name="search" value="{{ search_term }}" 
-                                   placeholder="اسم، يوزر، إيميل...">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">الفرع</label>
-                            <select class="form-select" name="branch_id">
-                                <option value="">الكل</option>
-                                {% for branch in branches %}
-                                <option value="{{ branch.id }}" {% if selected_branch == branch.id|string %}selected{% endif %}>
-                                    {{ branch.name }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">القسم</label>
-                            <select class="form-select" name="department">
-                                <option value="">الكل</option>
-                                {% for dept in departments %}
-                                <option value="{{ dept.dept_name }}" {% if selected_department == dept.dept_name %}selected{% endif %}>
-                                    {{ dept.dept_name_ar }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label">الدور</label>
-                            <select class="form-select" name="role">
-                                <option value="">الكل</option>
-                                {% for role in roles %}
-                                <option value="{{ role.role_name }}" {% if selected_role == role.role_name %}selected{% endif %}>
-                                    {{ role.role_name_ar }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-1 d-flex align-items-end">
-                            <button type="submit" class="btn btn-primary w-100">
-                                <i class="fas fa-search"></i>
+        <!-- ✅ الجدول -->
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>#</th>
+                        <th>اليوزر</th>
+                        <th>الاسم</th>
+                        <th>القسم</th>
+                        <th>الدور</th>
+                        <th>الفرع</th>
+                        <th>الحالة</th>
+                        <th>إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ user.username }}</td>
+                        <td>{{ user.full_name }}</td>
+                        <td>{{ user.department }}</td>
+                        <td>
+                            {% if user.role == 'compliance_officer' %}
+                            <span class="badge bg-danger">مسؤول الامتثال</span>
+                            {% elif user.role == 'general_manager' %}
+                            <span class="badge bg-primary">مدير عام</span>
+                            {% elif user.role == 'department_head' %}
+                            <span class="badge bg-warning text-dark">رئيس قسم</span>
+                            {% else %}
+                            <span class="badge bg-secondary">موظف</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ user.branch_name or '-' }}</td>
+                        <td>
+                            {% if user.is_active %}
+                            <span class="badge bg-success">نشط</span>
+                            {% else %}
+                            <span class="badge bg-danger">معطل</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <!-- ✅ زر التعديل -->
+                            <button type="button" class="btn btn-sm btn-info" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#editUser{{ user.id }}">
+                                <i class="fas fa-edit"></i>
                             </button>
-                        </div>
-                    </div>
-                    <div class="row mt-2">
-                        <div class="col-12">
-                            <a href="{{ url_for('manage_users') }}" class="btn btn-outline-secondary btn-sm">
-                                <i class="fas fa-undo"></i> إعادة تعيين
+                            <a href="{{ url_for('toggle_user', user_id=user.id) }}" class="btn btn-sm btn-warning">
+                                <i class="fas fa-toggle-on"></i>
                             </a>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-        
-        <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="fas fa-users ms-2"></i> قائمة المستخدمين</h5>
-                <div>
-                    <a href="{{ url_for('export_users_excel') }}" class="btn btn-success btn-sm me-2">
-                        <i class="fas fa-file-excel"></i> تصدير Excel
-                    </a>
-                    <button class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal">
-                        <i class="fas fa-plus"></i> إضافة مستخدم
-                    </button>
-                </div>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead class="table-dark">
-                            <tr>
-                                <th>#</th>
-                                <th>اليوزر</th>
-                                <th>الاسم</th>
-                                <th>القسم</th>
-                                <th>الدور</th>
-                                <th>الفرع</th>
-                                <th>الحالة</th>
-                                <th>إجراءات</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for user in users %}
-                            <tr>
-                                <td>{{ loop.index }}</td>
-                                <td>{{ user.username }}</td>
-                                <td>{{ user.full_name }}</td>
-                                <td>{{ user.department }}</td>
-                                <td>
-                                    {% if user.role == 'compliance_officer' %}
-                                    <span class="badge bg-danger">مسؤول الامتثال</span>
-                                    {% elif user.role == 'general_manager' %}
-                                    <span class="badge bg-primary">مدير عام</span>
-                                    {% elif user.role == 'department_head' %}
-                                    <span class="badge bg-warning text-dark">رئيس قسم</span>
-                                    {% else %}
-                                    <span class="badge bg-secondary">موظف</span>
-                                    {% endif %}
-                                </td>
-                                <td>{{ user.branch_name or '-' }}</td>
-                                <td>
-                                    {% if user.is_active %}
-                                    <span class="badge bg-success">نشط</span>
-                                    {% else %}
-                                    <span class="badge bg-danger">معطل</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <button class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#editUser{{ user.id }}">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <a href="{{ url_for('toggle_user', user_id=user.id) }}" class="btn btn-sm btn-warning">
-                                        <i class="fas fa-toggle-on"></i>
-                                    </a>
-                                    <a href="{{ url_for('reset_user_password_route', user_id=user.id) }}" class="btn btn-sm btn-secondary" onclick="return confirm('إعادة تعيين كلمة المرور إلى hawk123456؟')">
-                                        <i class="fas fa-key"></i>
-                                    </a>
-                                    <a href="{{ url_for('delete_user', user_id=user.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('هل أنت متأكد؟')">
-                                        <i class="fas fa-trash"></i>
-                                    </a>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                            <a href="{{ url_for('reset_user_password_route', user_id=user.id) }}" class="btn btn-sm btn-secondary" onclick="return confirm('إعادة تعيين كلمة المرور إلى hawk123456؟')">
+                                <i class="fas fa-key"></i>
+                            </a>
+                            <a href="{{ url_for('delete_user', user_id=user.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('هل أنت متأكد؟')">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
     
-    <!-- Modal إضافة مستخدم -->
-    <div class="modal fade" id="addUserModal" tabindex="-1">
+    <!-- ✅ Modals -->
+    {% for user in users %}
+    <div class="modal fade" id="editUser{{ user.id }}" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title">إضافة مستخدم جديد</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <h5 class="modal-title">تعديل مستخدم: {{ user.full_name }}</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form method="POST" action="{{ url_for('add_user') }}">
+                <form method="POST" action="{{ url_for('edit_user', user_id=user.id) }}">
                     <div class="modal-body">
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">اسم المستخدم</label>
-                                <input type="text" class="form-control" name="username" required>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">كلمة المرور</label>
-                                <input type="password" class="form-control" name="password" required>
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
                                 <label class="form-label">الاسم الكامل</label>
-                                <input type="text" class="form-control" name="full_name" required>
+                                <input type="text" class="form-control" name="full_name" value="{{ user.full_name }}" required>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">البريد الإلكتروني</label>
-                                <input type="email" class="form-control" name="email">
+                                <input type="email" class="form-control" name="email" value="{{ user.email or '' }}">
                             </div>
                         </div>
                         <div class="row">
@@ -202,7 +105,9 @@
                                 <label class="form-label">الدور</label>
                                 <select class="form-select" name="role" required>
                                     {% for role in roles %}
-                                    <option value="{{ role.role_name }}">{{ role.role_name_ar }}</option>
+                                    <option value="{{ role.role_name }}" {% if user.role == role.role_name %}selected{% endif %}>
+                                        {{ role.role_name_ar }}
+                                    </option>
                                     {% endfor %}
                                 </select>
                             </div>
@@ -210,7 +115,9 @@
                                 <label class="form-label">القسم</label>
                                 <select class="form-select" name="department" required>
                                     {% for dept in departments %}
-                                    <option value="{{ dept.dept_name }}">{{ dept.dept_name_ar }}</option>
+                                    <option value="{{ dept.dept_name }}" {% if user.department == dept.dept_name %}selected{% endif %}>
+                                        {{ dept.dept_name_ar }}
+                                    </option>
                                     {% endfor %}
                                 </select>
                             </div>
@@ -219,21 +126,53 @@
                                 <select class="form-select" name="branch_id">
                                     <option value="">بدون فرع</option>
                                     {% for branch in branches %}
-                                    <option value="{{ branch.id }}">{{ branch.name }}</option>
+                                    <option value="{{ branch.id }}" {% if user.branch_id == branch.id %}selected{% endif %}>
+                                        {{ branch.name }}
+                                    </option>
                                     {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">كلمة مرور جديدة (اختياري)</label>
+                                <input type="password" class="form-control" name="new_password" placeholder="اتركه فارغاً إذا لا تريد التغيير">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">الحالة</label>
+                                <select class="form-select" name="is_active">
+                                    <option value="1" {% if user.is_active %}selected{% endif %}>نشط</option>
+                                    <option value="0" {% if not user.is_active %}selected{% endif %}>معطل</option>
                                 </select>
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
-                        <button type="submit" class="btn btn-primary">حفظ</button>
+                        <button type="submit" class="btn btn-primary">حفظ التعديلات</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
+    {% endfor %}
     
+    <!-- ✅ Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- ✅ حل احتياطي -->
+    <script>
+        document.querySelectorAll('[data-bs-toggle="modal"]').forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('data-bs-target');
+                const modalElement = document.querySelector(targetId);
+                if (modalElement) {
+                    const modal = bootstrap.Modal.getInstance(modalElement) || new bootstrap.Modal(modalElement);
+                    modal.show();
+                }
+            });
+        });
+    </script>
 </body>
 </html>
